@@ -99,6 +99,11 @@ const Profile = () => {
   const [isMembershipFeePayment, setIsMembershipFeePayment] = useState(false);
   const [activeAllocationDropdown, setActiveAllocationDropdown] = useState(null);
   const [validBusinessTypes, setValidBusinessTypes] = useState([]);
+  const [loanLimitModalVisible, setLoanLimitModalVisible] = useState(false);
+  const [loanLimitData, setLoanLimitData] = useState(null);
+  const [loadingLoanLimit, setLoadingLoanLimit] = useState(false);
+  const [newLoanLimit, setNewLoanLimit] = useState('');
+  const [showBalanceDueToday, setShowBalanceDueToday] = useState(false);
 
   
 
@@ -147,7 +152,7 @@ const Profile = () => {
     'Pending Onboarding': 'Onboard',
     'Pending BM Approval': 'BM Approval',
     'Pending HQ Approval': 'HQ Approval',
-    'Dormant': 'Receive Payment',
+    'Pending RF': 'Receive RF',
     'Active': 'Create Loan',
   };
   return buttonTextMap[status] || status;
@@ -167,8 +172,8 @@ const Profile = () => {
     setBmApprovalModalVisible(true);
   } else if (customer.status === 'Pending HQ Approval') {
     setHqApprovalModalVisible(true);
-  } else if (customer.status === 'Dormant') {
-    setIsMembershipFeePayment(true); // Dormant = membership fee only
+  } else if (customer.status === 'Pending RF') {
+    setIsMembershipFeePayment(true); // Pending RF = membership fee only
     setPaymentModalVisible(true);
   } else {
     Alert.alert('Action', `Perform action for status: ${customer.status}`);
@@ -285,10 +290,10 @@ const Profile = () => {
             3: 'Pending Onboarding',          // __APPROVEDLEAD
             4: 'Pending BM Approval',         // __ONBOARDED
             5: 'Pending HQ Approval',         // __CLIENTBMAPPROVED
-            6: 'Dormant',                     // __CLIENTHQAPPROVED
+            6: 'Pending RF',                     // __CLIENTHQAPPROVED
             7: 'Appraise',                    // __APPRAISED
             8: 'Approve Appraisal (BM)',      // __APPRAISALBMAPPROVED
-            9: 'Dormant',      // __APPRAISALHQAPPROVED
+            9: 'Pending RF',      // __APPRAISALHQAPPROVED
             10: 'Active',                     // __ACTIVE
             '-1': 'Rejected Lead',            // __REJECTEDLEAD
             '-2': 'Rejected Client',          // __REJECTEDCLIENT
@@ -303,30 +308,33 @@ const Profile = () => {
           loanLimit: data.client.loan_limit 
             ? `Ksh ${data.client.loan_limit} per product` 
             : 'Ksh 0 per product',
+          loanLimitApproved: data.client.approved_loan_limit 
+            ? `Ksh ${data.client.approved_loan_limit} per product` 
+            : 'Ksh 0 per product',
           loanPrincipal: data.client.loan_principal 
             ? `Ksh ${data.client.loan_principal}` 
             : '-',
-          dateDisbursed: data.client.date_disbursed || 
-                         data.client.disbursement_date || '-',
-          loanDueDate: data.client.loan_due_date || 
-                       data.client.due_date || '-',
-          repayableAmount: data.client.repayable_amount 
-            ? `Ksh ${data.client.repayable_amount}` 
-            : '-',
-          totalPaid: data.client.total_paid 
-            ? `Ksh ${data.client.total_paid}` 
-            : '-',
-          totalBalance: data.client.total_balance || 
-                        data.client.balance 
-            ? `Ksh ${data.client.total_balance || data.client.balance}` 
-            : '-',
-          balanceDueToday: data.client.balance_due_today 
-            ? `Ksh ${data.client.balance_due_today}` 
-            : '-',
-          availableTopUp: data.client.available_topup || 
-                          data.client.topup_amount 
-            ? `Ksh ${data.client.available_topup || data.client.topup_amount}` 
-            : '-',
+          // dateDisbursed: data.client.date_disbursed || 
+          //                data.client.disbursement_date || '-',
+          // loanDueDate: data.client.loan_due_date || 
+          //              data.client.due_date || '-',
+          // repayableAmount: data.client.repayable_amount 
+          //   ? `Ksh ${data.client.repayable_amount}` 
+          //   : '-',
+          // totalPaid: data.client.total_paid 
+          //   ? `Ksh ${data.client.total_paid}` 
+          //   : '-',
+          // totalBalance: data.client.total_balance || 
+          //               data.client.balance 
+          //   ? `Ksh ${data.client.total_balance || data.client.balance}` 
+          //   : '-',
+          // balanceDueToday: data.client.balance_due_today 
+          //   ? `Ksh ${data.client.balance_due_today}` 
+          //   : '-',
+          // availableTopUp: data.client.available_topup || 
+          //                 data.client.topup_amount 
+          //   ? `Ksh ${data.client.available_topup || data.client.topup_amount}` 
+          //   : '-',
         },
         
         rawData: data.client,
@@ -387,6 +395,8 @@ const Profile = () => {
     }
 
     const data = await response.json();
+    console.log("Loans payload:", data.payload);
+
     
     if (data.success && data.payload) {
       setLoans(data.payload);
@@ -401,6 +411,103 @@ const Profile = () => {
     setLoadingLoans(false);
   }
 };
+
+ const fetchLoanLimit = async () => {
+  try {
+    setLoadingLoanLimit(true);
+    const token = await AsyncStorage.getItem('token');
+    
+    if (!token) {
+      throw new Error('No token found');
+    }
+
+    const response = await fetch(
+      `${API_BASE_URL}/api/clients/${memberId}`,
+      {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log('Loan Limit Data:', data);
+    
+    // Check if we have client data
+    if (data.client) {
+      setLoanLimitData({
+        systemLimit: data.client.loan_limit,
+        approvedLimit: data.client.approved_loan_limit,
+      });
+      setLoanLimitModalVisible(true);
+    }
+    
+  } catch (err) {
+    console.error('Error fetching loan limit:', err);
+    Alert.alert('Error', `Failed to load loan limit: ${err.message}`);
+  } finally {
+    setLoadingLoanLimit(false);
+  }
+};
+  const handleSetNewLimit = async () => {
+    try {
+      if (!newLoanLimit || parseFloat(newLoanLimit) <= 0) {
+        Alert.alert('Error', 'Please enter a valid loan limit');
+        return;
+      }
+
+      setLoadingLoanLimit(true);
+      const token = await AsyncStorage.getItem('token');
+      
+      if (!token) {
+        throw new Error('No token found');
+      }
+
+      const response = await fetch(
+        `${API_BASE_URL}/api/clients/${memberId}/limit`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            loan_limit: parseFloat(newLoanLimit)
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('Set Loan Limit Response:', data);
+      
+      if (data.success) {
+        Alert.alert('Success', 'Loan limit updated successfully');
+        setLoanLimitModalVisible(false);
+        setNewLoanLimit('');
+        
+        // Refresh customer profile to get updated data
+        await fetchCustomerProfile();
+      } else {
+        Alert.alert('Error', data.error || 'Failed to update loan limit');
+      }
+      
+    } catch (err) {
+      console.error('Error setting loan limit:', err);
+      Alert.alert('Error', `Failed to update loan limit: ${err.message}`);
+    } finally {
+      setLoadingLoanLimit(false);
+    }
+  };
 
 const fetchDisbursements = async (page = 1) => {
   try {
@@ -444,7 +551,7 @@ const fetchDisbursements = async (page = 1) => {
   }
 };
 
-const calculateLoanSummary = () => {
+ const calculateLoanSummary = () => {
   if (!loans || loans.length === 0) {
     return {
       noOfLoans: 0,
@@ -460,60 +567,38 @@ const calculateLoanSummary = () => {
     };
   }
 
-  // Filter active loans (DISBURSED, DEFAULTED, etc.)
-  const activeLoans = loans.filter(loan => 
-    loan.status === 'DISBURSED' || 
-    loan.status === 'DEFAULTED' || 
-    loan.status === 'REPOSSESSION'
-  );
-
-  // Calculate totals
   const totalPrincipal = loans.reduce((sum, loan) => sum + (loan.amount || 0), 0);
-  const totalBalance = activeLoans.reduce((sum, loan) => sum + (loan.outstanding_balance || 0), 0);
-  const totalPaid = activeLoans.reduce((sum, loan) => sum + (loan.total_paid || 0), 0);
-  const totalRepayable = activeLoans.reduce((sum, loan) => sum + (loan.total_repayable || 0), 0);
-  
-  // Get most recent disbursement date
-  const disbursedLoans = loans.filter(loan => loan.disbursement_date);
+  const totalBalance = loans.reduce((sum, loan) => sum + (loan.il_balance_due || loan.outstanding_balance || 0), 0);
+  const totalPaid = loans.reduce((sum, loan) => sum + (loan.total_amount_paid || 0), 0);
+  const totalRepayable = loans.reduce((sum, loan) => sum + (loan.repayable_amount || 0), 0);
+
+  const disbursedLoans = loans.filter(loan => loan.disbursed_at);
   const latestDisbursement = disbursedLoans.length > 0
-    ? new Date(Math.max(...disbursedLoans.map(loan => new Date(loan.disbursement_date))))
+    ? new Date(Math.max(...disbursedLoans.map(loan => new Date(loan.disbursed_at))))
     : null;
 
-  // Get nearest due date
-  const loansWithDueDate = activeLoans.filter(loan => loan.next_due_date);
+  const loansWithDueDate = loans.filter(loan => loan.next_due_date);
   const nearestDueDate = loansWithDueDate.length > 0
     ? new Date(Math.min(...loansWithDueDate.map(loan => new Date(loan.next_due_date))))
     : null;
 
-  // Calculate balance due today
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const balanceDueToday = activeLoans
-    .filter(loan => {
-      if (!loan.next_due_date) return false;
-      const dueDate = new Date(loan.next_due_date);
-      dueDate.setHours(0, 0, 0, 0);
-      return dueDate <= today;
-    })
-    .reduce((sum, loan) => sum + (loan.installment_amount || 0), 0);
+  const balanceDueToday = loans.reduce((sum, loan) => sum + (loan.amount_due_today || 0), 0);
 
   return {
     noOfLoans: loans.length,
-    loanLimit: customer?.loans?.loanLimit || 'Ksh 0 per product', // Keep from profile
+    loanLimit: customer?.loans?.loanLimit || 'Ksh 0 per product',
     loanPrincipal: `Ksh ${totalPrincipal.toLocaleString()}`,
-    dateDisbursed: latestDisbursement 
-      ? latestDisbursement.toLocaleDateString() 
-      : '-',
-    loanDueDate: nearestDueDate 
-      ? nearestDueDate.toLocaleDateString() 
-      : '-',
+    dateDisbursed: latestDisbursement ? latestDisbursement.toLocaleDateString() : '-',
+    loanDueDate: nearestDueDate ? nearestDueDate.toLocaleDateString() : '-',
     repayableAmount: `Ksh ${totalRepayable.toLocaleString()}`,
     totalPaid: `Ksh ${totalPaid.toLocaleString()}`,
     totalBalance: `Ksh ${totalBalance.toLocaleString()}`,
-    balanceDueToday: `Ksh ${balanceDueToday.toLocaleString()}`,
-    availableTopUp: customer?.loans?.availableTopUp || 'Ksh 0', // Keep from profile
+    balanceDueToday: ` ${Math.round(balanceDueToday).toLocaleString()}`,
+    availableTopUp: customer?.loans?.availableTopUp || 'Ksh 0',
   };
 };
+
+
 
   const handleAllocate = async () => {
     try {
@@ -1253,7 +1338,7 @@ const handleSubmitAssessment = async () => {
                 customer.status === 'Appraise' && styles.appraiseButton,
                 customer.status === 'Approve Appraisal (BM)' && styles.approveButton,
                 customer.status === 'Approve Appraisal (HQ)' && styles.approveButton,
-                customer.status === 'Dormant' && styles.receivePaymentButton,
+                customer.status === 'Pending RF' && styles.receivePaymentButton,
               ]}
               onPress={handleStatusAction}
             >
@@ -1275,13 +1360,26 @@ const handleSubmitAssessment = async () => {
           <View style={styles.profileInfo}>
             <View style={styles.nameRow}>
               <Text style={styles.customerName}>{customer.name}</Text>
-              <TouchableOpacity
-                style={styles.detailsButton}
-                onPress={() => router.push(`/client_details?member_id=${memberId}`)}
-              >
-                <Text style={styles.detailsButtonText}>Details</Text>
-              </TouchableOpacity>
+              <View style={styles.buttonColumn}>
+                <TouchableOpacity
+                  style={styles.detailsButton}
+                  onPress={() => router.push(`/client_details?member_id=${memberId}`)}
+                >
+                  <Text style={styles.detailsButtonText}>Details</Text>
+                </TouchableOpacity>
                 
+                <TouchableOpacity
+                  style={styles.loanLimitButtonSmall}
+                  onPress={fetchLoanLimit}
+                  disabled={loadingLoanLimit}
+                >
+                  {loadingLoanLimit ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Text style={styles.loanLimitButtonText}>Loan Limit</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
             <Text style={styles.phoneNumber}>{customer.phone}</Text>
             <Text style={styles.teamLabel}>Team: {customer.team || 'Not Assigned'}</Text>
@@ -1382,12 +1480,27 @@ const handleSubmitAssessment = async () => {
                 
                 <View style={styles.loanRow}>
                   <Text style={styles.loanLabel}>Balance Due Today:</Text>
-                  <Text style={[
-                    styles.loanValue,
-                    loanSummary.balanceDueToday !== 'Ksh 0' && { color: '#FF9800', fontWeight: '600' }
-                  ]}>
-                    {loanSummary.balanceDueToday}
-                  </Text>
+                  <TouchableOpacity 
+                    onPress={() => setShowBalanceDueToday(!showBalanceDueToday)}
+                    style={styles.balanceToggleContainer}
+                  >
+                    {showBalanceDueToday ? (
+                      <Text style={[
+                        styles.loanValue,
+                        loanSummary?.balanceDueToday !== 0 && { color: '#FF9800', fontWeight: '600' }
+                      ]}>
+                        Ksh {(loanSummary?.balanceDueToday || 0).toLocaleString()}
+                      </Text>
+                    ) : (
+                      <Text style={styles.balanceHidden}>****</Text>
+                    )}
+                    <Ionicons 
+                      name={showBalanceDueToday ? "eye-off" : "eye"} 
+                      size={18} 
+                      color="#666" 
+                      style={{ marginLeft: 8 }}
+                    />
+                  </TouchableOpacity>
                 </View>
                 
                 <View style={styles.loanRow}>
@@ -1396,33 +1509,31 @@ const handleSubmitAssessment = async () => {
                 </View>
                 
                 {loans.length > 0 ? (
-                <TouchableOpacity 
-                  style={styles.viewLoanButton}
-                  onPress={() => {
-                    // Navigate to loan details page and pass the memberId
-                    router.push(`/loan_details?member_id=${memberId}`);
-                  }}
-                >
-                  <Text style={styles.viewLoanButtonText}>
-                    View {loans.length} Loan{loans.length > 1 ? 's' : ''}
-                  </Text>
-                </TouchableOpacity>
-              ) : (
-                <TouchableOpacity 
-                  style={[styles.viewLoanButton, { backgroundColor: '#4CAF50' }]}
-                  onPress={() => router.push(`/create_loan?client_id=${memberId}`)}
-                >
-                  <Text style={styles.viewLoanButtonText}>Create First Loan</Text>
-                </TouchableOpacity>
-              )}
-
+                  <TouchableOpacity 
+                    style={styles.viewLoanButton}
+                    onPress={() => {
+                      router.push(`/loan_details?member_id=${memberId}`);
+                    }}
+                  >
+                    <Text style={styles.viewLoanButtonText}>
+                      View {loans.length} Loan{loans.length > 1 ? 's' : ''}
+                    </Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity 
+                    style={[styles.viewLoanButton, { backgroundColor: '#4CAF50' }]}
+                    onPress={() => router.push(`/create_loan?client_id=${memberId}`)}
+                  >
+                    <Text style={styles.viewLoanButtonText}>Create First Loan</Text>
+                  </TouchableOpacity>
+                )}
               </>
             );
           })()}
         </View>
 
-        {/* Action Buttons Grid */}
-        <View style={styles.actionButtonsGrid}>
+                {/* Action Buttons Grid */}
+                <View style={styles.actionButtonsGrid}>
           <TouchableOpacity style={[styles.actionButton, styles.locationButton]}>
             <Ionicons name="location-outline" size={18} color="#fff" />
             <Text style={styles.actionButtonText}>Location</Text>
@@ -2753,6 +2864,60 @@ const handleSubmitAssessment = async () => {
           </View>
         </View>
       </Modal>
+      {/* Loan Limit Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={loanLimitModalVisible}
+        onRequestClose={() => setLoanLimitModalVisible(false)}
+      >
+        <View style={styles.loanLimitModalOverlay}>
+          <View style={styles.changeLoanLimitModalContent}>
+            <View style={styles.changeLoanLimitHeader}>
+              <Text style={styles.changeLoanLimitTitle}>Change Loan limit</Text>
+              <TouchableOpacity 
+                onPress={() => {
+                  setLoanLimitModalVisible(false);
+                  setNewLoanLimit('');
+                }}
+                style={styles.loanLimitCloseButton}
+              >
+                <Ionicons name="close" size={24} color="#333" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.changeLoanLimitBody}>
+              {/* Current Limit Display */}
+              <View style={styles.currentLimitSection}>
+                <Text style={styles.currentLimitLabel}>Current limit</Text>
+                <Text style={styles.currentLimitValue}>
+                  KES {loanLimitData?.approvedLimit?.toLocaleString() || '0.0'}
+                </Text>
+              </View>
+
+              {/* New Credit Limit Input */}
+              <Text style={styles.newLimitLabel}>Enter New Credit Limit</Text>
+              <TextInput
+                style={styles.newLimitInput}
+                value={newLoanLimit}
+                onChangeText={setNewLoanLimit}
+                placeholder="Enter new limit amount"
+                keyboardType="numeric"
+              />
+
+              {/* Set New Limit Button */}
+              <TouchableOpacity 
+                style={styles.setNewLimitButton}
+                onPress={handleSetNewLimit}
+                disabled={!newLoanLimit || parseFloat(newLoanLimit) <= 0}
+              >
+                <Ionicons name="trending-up" size={20} color="#fff" />
+                <Text style={styles.setNewLimitButtonText}>Set new limit</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -3674,6 +3839,186 @@ createLoanButtonSmall: {
   paddingVertical: 6,
   borderRadius: 4,
 },
+
+buttonColumn: {
+  flexDirection: 'column',
+  gap: 6,
+},
+loanLimitButtonSmall: {
+  backgroundColor: '#2196F3',
+  paddingHorizontal: 12,
+  paddingVertical: 4,
+  borderRadius: 4,
+  alignItems: 'center',
+  minWidth: 70,
+},
+loanLimitButtonText: {
+  color: '#fff',
+  fontSize: 12,
+  fontWeight: '600',
+},
+loanLimitModalOverlay: {
+  flex: 1,
+  backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+loanLimitModalContent: {
+  backgroundColor: '#fff',
+  borderRadius: 12,
+  width: '85%',
+  maxHeight: '60%',
+  overflow: 'hidden',
+},
+loanLimitModalHeader: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  paddingHorizontal: 20,
+  paddingVertical: 16,
+  borderBottomWidth: 1,
+  borderBottomColor: '#e0e0e0',
+},
+loanLimitModalTitle: {
+  fontSize: 20,
+  fontWeight: '600',
+  color: '#333',
+},
+loanLimitCloseButton: {
+  padding: 4,
+},
+loanLimitModalBody: {
+  padding: 20,
+},
+loanLimitDescription: {
+  fontSize: 14,
+  color: '#666',
+  lineHeight: 20,
+  marginBottom: 24,
+},
+highlightedText: {
+  color: '#4285F4',
+  fontWeight: '600',
+},
+loanLimitDetails: {
+  gap: 20,
+},
+productLimitSection: {
+  backgroundColor: '#f8f9fa',
+  padding: 16,
+  borderRadius: 8,
+},
+productName: {
+  fontSize: 16,
+  fontWeight: '600',
+  color: '#333',
+  marginBottom: 12,
+},
+limitRow: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  marginBottom: 8,
+},
+limitLabel: {
+  fontSize: 14,
+  color: '#666',
+},
+limitValue: {
+  fontSize: 16,
+  fontWeight: '600',
+  color: '#4285F4',
+},
+limitValueApproved: {
+  fontSize: 16,
+  fontWeight: '600',
+  color: '#4285F4',
+},
+noDataContainer: {
+  paddingVertical: 40,
+  alignItems: 'center',
+},
+noDataText: {
+  fontSize: 14,
+  color: '#999',
+},
+changeLoanLimitModalContent: {
+  backgroundColor: '#fff',
+  borderRadius: 12,
+  width: '85%',
+  overflow: 'hidden',
+},
+changeLoanLimitHeader: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  paddingHorizontal: 20,
+  paddingVertical: 16,
+  borderBottomWidth: 1,
+  borderBottomColor: '#e0e0e0',
+},
+changeLoanLimitTitle: {
+  fontSize: 20,
+  fontWeight: '600',
+  color: '#333',
+},
+changeLoanLimitBody: {
+  padding: 20,
+},
+currentLimitSection: {
+  marginBottom: 24,
+},
+currentLimitLabel: {
+  fontSize: 14,
+  color: '#666',
+  marginBottom: 8,
+},
+currentLimitValue: {
+  fontSize: 32,
+  fontWeight: '700',
+  color: '#4285F4',
+},
+newLimitLabel: {
+  fontSize: 14,
+  fontWeight: '500',
+  color: '#333',
+  marginBottom: 8,
+},
+newLimitInput: {
+  borderWidth: 1,
+  borderColor: '#ddd',
+  borderRadius: 8,
+  paddingHorizontal: 16,
+  paddingVertical: 12,
+  fontSize: 16,
+  color: '#333',
+  backgroundColor: '#fff',
+  marginBottom: 24,
+},
+setNewLimitButton: {
+  backgroundColor: '#4285F4',
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'center',
+  paddingVertical: 14,
+  borderRadius: 8,
+  gap: 8,
+},
+setNewLimitButtonText: {
+  color: '#fff',
+  fontSize: 16,
+  fontWeight: '600',
+},
+balanceToggleContainer: {
+  flexDirection: 'row',
+  alignItems: 'center',
+},
+balanceHidden: {
+  fontSize: 13,
+  color: '#333',
+  fontWeight: '500',
+  letterSpacing: 2,
+}
 });
 
 export default Profile;

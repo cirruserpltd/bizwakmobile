@@ -133,7 +133,7 @@ const NewLead = () => {
       console.log("Matched product:", selectedProduct);
       console.log("Matched BDE:", selectedBde);
 
-      // ✅ Check if the selections were found
+      
       if (!selectedBranch || !selectedProduct || !selectedBde) {
         alert("Invalid branch, product, or BDE selection. Please reselect.");
         return;
@@ -261,7 +261,7 @@ const NewLead = () => {
         >
           <Text style={styles.backIcon}>←</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Add New Lead</Text>
+        <Text style={styles.headerTitle}>Add Customer</Text>
       </View>
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>

@@ -39,7 +39,8 @@ const LoanManagementForm = ({ navigation, route }) => {
   const [products, setProducts] = useState([]);
   const [approvedLoanLimit, setApprovedLoanLimit] = useState('');
   const [availableCredit, setAvailableCredit] = useState(0);
-  const [actualLoanAmount, setActualLoanAmount] = useState('');
+  const [requestedLoanAmount, setRequestedLoanAmount] = useState(''); // Renamed from actualLoanAmount
+  const [actualLoanLimit, setActualLoanLimit] = useState(''); // New field
   const [repaymentDuration, setRepaymentDuration] = useState('');
   const [selectedImage, setSelectedImage] = useState(null);
   const [bde, setBde] = useState('');
@@ -61,79 +62,80 @@ const LoanManagementForm = ({ navigation, route }) => {
       return;
     }
 
-  console.log("✅ clientId available, fetching initial data...");
-  fetchInitialData();
-}, [clientId]);
-
-
+    console.log("✅ clientId available, fetching initial data...");
+    fetchInitialData();
+  }, [clientId]);
 
   useEffect(() => {
-    if (formType === 'loan' && actualLoanAmount) {
-      validateLoanAmount(actualLoanAmount);
+    if (formType === 'loan' && requestedLoanAmount) {
+      validateLoanAmount(requestedLoanAmount);
     }
-  }, [actualLoanAmount, formType]);
+  }, [requestedLoanAmount, formType]);
 
   const fetchInitialData = async () => {
     console.log("✅ Fetching initial data for:", clientId);
-  setLoading(true);
-  try {
-    const token = await AsyncStorage.getItem('token');
-    console.log('🔑 Token:', token);
+    setLoading(true);
+    try {
+      const token = await AsyncStorage.getItem('token');
+      console.log('🔑 Token:', token);
 
-    // --- Fetch available credit ---
-    const creditResponse = await axios.get(
-      `${API_BASE_URL}/api/loans/available-credit/${clientId}`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    console.log('💳 Credit response:', creditResponse.data);
+      // --- Fetch available credit ---
+      const creditResponse = await axios.get(
+        `${API_BASE_URL}/api/loans/available-credit/${clientId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      console.log('💳 Credit response:', creditResponse.data);
 
-    if (creditResponse.data.success) {
-      setAvailableCredit(creditResponse.data.available_credit);
-      setCurrentLoanLimit(creditResponse.data.available_credit.toString());
-    }
-    // --- Fetch products ---
-    const productsResp = await fetch(`${API_BASE_URL}/api/products/individual`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    const productsData = await productsResp.json();
-    console.log('📦 Products data:', productsData);
-
-    if (productsResp.ok) {
-      const formattedProducts = (productsData.payload || []).map((prod) => ({
-        label: prod.name,
-        value: prod.id,
-      }));
-      setProducts(formattedProducts);
-    }
-
-    // --- Fetch BDEs ---
-    const bdesResp = await fetch(`${API_BASE_URL}/api/users`, {
-      headers: { 
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json"
+      if (creditResponse.data.success) {
+        const credit = creditResponse.data.available_credit;
+        setAvailableCredit(credit);
+        setCurrentLoanLimit(credit.toString());
+        // Set approved loan limit to be visible
+        setApprovedLoanLimit(credit.toLocaleString());
       }
-    });
-    const bdesData = await bdesResp.json();
-    console.log('👤 BDEs data:', bdesData);
 
-    if (bdesResp.ok) {
-      const formattedBdes = (bdesData.payload || []).map((bde) => ({
-        label: bde.name,
-        value: bde.id,
-      }));
-      setBdeOptions(formattedBdes);
-    } else {
-      console.warn('❌ Failed to fetch BDEs');
+      // --- Fetch products ---
+      const productsResp = await fetch(`${API_BASE_URL}/api/products/individual`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const productsData = await productsResp.json();
+      console.log('📦 Products data:', productsData);
+
+      if (productsResp.ok) {
+        const formattedProducts = (productsData.payload || []).map((prod) => ({
+          label: prod.name,
+          value: prod.id,
+        }));
+        setProducts(formattedProducts);
+      }
+
+      // --- Fetch BDEs ---
+      const bdesResp = await fetch(`${API_BASE_URL}/api/users`, {
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json"
+        }
+      });
+      const bdesData = await bdesResp.json();
+      console.log('👤 BDEs data:', bdesData);
+
+      if (bdesResp.ok) {
+        const formattedBdes = (bdesData.payload || []).map((bde) => ({
+          label: bde.name,
+          value: bde.id,
+        }));
+        setBdeOptions(formattedBdes);
+      } else {
+        console.warn('❌ Failed to fetch BDEs');
+      }
+
+    } catch (error) {
+      console.error('💥 Error fetching initial data:', error);
+      Alert.alert('Error', 'Failed to load form data. Please try again.');
+    } finally {
+      setLoading(false);
     }
-
-  } catch (error) {
-    console.error('💥 Error fetching initial data:', error);
-    Alert.alert('Error', 'Failed to load form data. Please try again.');
-  } finally {
-    setLoading(false);
-  }
-};
-
+  };
 
   const validateLoanAmount = async (amount) => {
     if (!amount || isNaN(amount)) return;
@@ -204,8 +206,13 @@ const LoanManagementForm = ({ navigation, route }) => {
       return false;
     }
 
-    if (!actualLoanAmount || parseFloat(actualLoanAmount) <= 0) {
-      Alert.alert('Validation Error', 'Please enter a valid loan amount');
+    if (!requestedLoanAmount || parseFloat(requestedLoanAmount) <= 0) {
+      Alert.alert('Validation Error', 'Please enter a valid requested loan amount');
+      return false;
+    }
+
+    if (!actualLoanLimit || parseFloat(actualLoanLimit) <= 0) {
+      Alert.alert('Validation Error', 'Please enter a valid actual loan limit');
       return false;
     }
 
@@ -218,85 +225,86 @@ const LoanManagementForm = ({ navigation, route }) => {
   };
 
   const handleApprove = async () => {
-  if (!validateForm()) return;
+    if (!validateForm()) return;
 
-  Alert.alert(
-    'Confirm Submission',
-    `Are you sure you want to create this ${formType === 'loan' ? 'loan' : 'top-up'} application?`,
-    [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Create',
-        onPress: async () => {
-          setSubmitting(true);
-          try {
-            const token = await AsyncStorage.getItem('token'); // 👈 retrieve token here
-            if (!token) {
-              Alert.alert('Error', 'Authentication token not found. Please log in again.');
-              return;
-            }
-
-            const formData = new FormData();
-            formData.append('amount', actualLoanAmount);
-            formData.append('product', product);
-            formData.append('bdo_individual_loan_approval_id', bde);
-            if (creationNotes) formData.append('creation_notes', creationNotes);
-
-            const response = await axios.post(
-              `${API_BASE_URL}/api/loans/createnewindividualloans/${clientId}`,
-              formData,
-              {
-                headers: {
-                  'Content-Type': 'multipart/form-data',
-                  'Authorization': `Bearer ${token}`, // ✅ added correctly
-                },
-              }
-            );
-
-            if (response.data.success) {
-              const loanId = response.data.payload.id;
-
-              if (selectedImage && formType === 'loan') {
-                const imageFormData = new FormData();
-                imageFormData.append('disbursement_form_img', {
-                  uri: selectedImage.uri,
-                  type: 'image/jpeg',
-                  name: 'disbursement_form.jpg',
-                });
-
-                await axios.post(
-                  `${API_BASE_URL}/loans/view/loan/profile/${loanId}/uploaddisbursementform`,
-                  imageFormData,
-                  {
-                    headers: {
-                      'Content-Type': 'multipart/form-data',
-                      'Authorization': `Bearer ${token}`,
-                    },
-                  }
-                );
+    Alert.alert(
+      'Confirm Submission',
+      `Are you sure you want to create this ${formType === 'loan' ? 'loan' : 'top-up'} application?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Create',
+          onPress: async () => {
+            setSubmitting(true);
+            try {
+              const token = await AsyncStorage.getItem('token');
+              if (!token) {
+                Alert.alert('Error', 'Authentication token not found. Please log in again.');
+                return;
               }
 
-              Alert.alert(
-                'Success',
-                `Loan ${response.data.payload.loan_number} created successfully`,
-                [{ text: 'OK', onPress: () => router.back() }]
+              const formData = new FormData();
+              formData.append('requested_amount', requestedLoanAmount);
+              formData.append('amount', actualLoanLimit);
+              formData.append('product', product);
+              formData.append('bdo_individual_loan_approval_id', bde);
+              if (creationNotes) formData.append('creation_notes', creationNotes);
+
+              const response = await axios.post(
+                `${API_BASE_URL}/api/loans/createnewindividualloans/${clientId}`,
+                formData,
+                {
+                  headers: {
+                    'Content-Type': 'multipart/form-data',
+                    'Authorization': `Bearer ${token}`,
+                  },
+                }
               );
-            } else {
-              Alert.alert('Error', response.data.error || 'Failed to create loan');
+
+              if (response.data.success) {
+                const loanId = response.data.payload.id;
+
+                if (selectedImage && formType === 'loan') {
+                  const imageFormData = new FormData();
+                  imageFormData.append('disbursement_form_img', {
+                    uri: selectedImage.uri,
+                    type: 'image/jpeg',
+                    name: 'disbursement_form.jpg',
+                  });
+
+                  await axios.post(
+                    `${API_BASE_URL}/loans/view/loan/profile/${loanId}/uploaddisbursementform`,
+                    imageFormData,
+                    {
+                      headers: {
+                        'Content-Type': 'multipart/form-data',
+                        'Authorization': `Bearer ${token}`,
+                      },
+                    }
+                  );
+                }
+
+                Alert.alert(
+                  'Success',
+                  `Loan ${response.data.payload.loan_number} created successfully`,
+                  [{ text: 'OK', onPress: () => router.back() }]
+                );
+              } else {
+                Alert.alert('Error', response.data.error || 'Failed to create loan');
+              }
+            } catch (error) {
+              console.error('Error creating loan:', error);
+              const errorMessage =
+                error.response?.data?.error || 'Failed to create loan. Please try again.';
+              Alert.alert('Error', errorMessage);
+            } finally {
+              setSubmitting(false);
             }
-          } catch (error) {
-            console.error('Error creating loan:', error);
-            const errorMessage =
-              error.response?.data?.error || 'Failed to create loan. Please try again.';
-            Alert.alert('Error', errorMessage);
-          } finally {
-            setSubmitting(false);
-          }
+          },
         },
-      },
-    ]
-  );
-};
+      ]
+    );
+  };
 
   const handleDecline = () => {
     Alert.alert(
@@ -433,19 +441,20 @@ const LoanManagementForm = ({ navigation, route }) => {
             </View>
           </View>
 
-          {/* 3. Approved Loan Limit */}
+          {/* 3. Approved Loan Limit - Now visible with proper styling */}
           <View style={styles.formGroup}>
-            <Text style={styles.label}>Approved Loan Limit</Text>
-            <TextInput
-              style={[styles.input, styles.inputDisabled]}
-              value={approvedLoanLimit}
-              editable={false}
-            />
+            <Text style={styles.label}>Approved Loan Limit (KES)</Text>
+            <View style={styles.creditInfoBox}>
+              <Ionicons name="cash-outline" size={24} color="#2196F3" />
+              <Text style={styles.creditAmount}>
+                KES {approvedLoanLimit || '0'}
+              </Text>
+            </View>
           </View>
 
           {/* 4. Available Credit */}
           <View style={styles.formGroup}>
-            <Text style={styles.label}>Available Credit</Text>
+            <Text style={styles.label}>Available Credit (KES)</Text>
             <View style={styles.creditInfoBox}>
               <Ionicons name="cash-outline" size={24} color="#4CAF50" />
               <Text style={styles.creditAmount}>
@@ -454,14 +463,14 @@ const LoanManagementForm = ({ navigation, route }) => {
             </View>
           </View>
 
-          {/* 5. Actual Loan Amount */}
+          {/* 5. Requested Loan Amount - Renamed from Actual Loan Amount */}
           <View style={styles.formGroup}>
-            <Text style={styles.label}>Actual Loan Amount *</Text>
+            <Text style={styles.label}>Requested Loan Amount (KES) *</Text>
             <TextInput
               style={[styles.input, !isEditable && styles.inputDisabled]}
-              value={actualLoanAmount}
-              onChangeText={setActualLoanAmount}
-              placeholder="Enter amount"
+              value={requestedLoanAmount}
+              onChangeText={setRequestedLoanAmount}
+              placeholder="Enter requested amount"
               keyboardType="numeric"
               editable={isEditable}
             />
@@ -539,7 +548,20 @@ const LoanManagementForm = ({ navigation, route }) => {
             </View>
           </View>
 
-          Creation Notes
+          {/* 9. Actual Loan Limit - New field added after BDE */}
+          <View style={styles.formGroup}>
+            <Text style={styles.label}>Actual Loan Amount (KES) *</Text>
+            <TextInput
+              style={[styles.input, !isEditable && styles.inputDisabled]}
+              value={actualLoanLimit}
+              onChangeText={setActualLoanLimit}
+              placeholder="Enter actual loan limit"
+              keyboardType="numeric"
+              editable={isEditable}
+            />
+          </View>
+
+          {/* 10. Creation Notes */}
           <View style={styles.formGroup}>
             <Text style={styles.label}>Creation Notes (Optional)</Text>
             <TextInput

@@ -1,3 +1,379 @@
+# 📱 EAS Build - Complete APK Deployment Guide for Bizwak Mobile
+
+**Building and Distributing Android APK using Expo Application Services**  
+This guide covers building a production-ready Android APK using **EAS Build (cloud-based)** without needing Android Studio or complex local setup.
+
+
+
+### ✅ Required
+
+- Node.js (v16 or higher)
+- npm or yarn
+- Expo project (React Native app using Expo)
+- Internet connection
+- Expo account (free)
+
+ 
+
+### ✅ Backend Configuration (Already Done)
+
+- Flask backend with JWT authentication  
+- API base URL: `https://bizwak.co.ke`  
+- CORS configured for mobile apps  
+
+---
+
+
+## 🚀 Step-by-Step Setup
+
+### Step 1: Install EAS CLI
+
+```bash
+npm install -g eas-cli
+eas --version
+
+
+### Step 2: Log in to Expo
+eas login
+
+- If you don’t have an account, sign up at https://expo.dev/signup
+.
+
+Verify login:
+
+eas whoami
+
+Step 3: Initialize EAS in Your Project
+cd /path/to/your/bizwakMobile
+eas build:configure
+
+
+Creates eas.json
+
+Links your project to Expo
+
+Sets up build profiles
+
+Step 4: Configure eas.json
+{
+  "cli": {
+    "version": ">= 5.2.0"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "android": {
+        "gradleCommand": ":app:assembleDebug"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      }
+    },
+    "production": {
+      "android": {
+        "buildType": "apk"
+      }
+    },
+    "production-aab": {
+      "android": {
+        "buildType": "app-bundle"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}
+
+
+Profile Explanations:
+
+development: Testing
+
+preview: Internal testing
+
+production: Final APK
+
+production-aab: Google Play Store format
+
+Step 5: Configure app.json / app.config.js
+{
+  "expo": {
+    "name": "Bizwak",
+    "slug": "bizwak-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "android": {
+      "package": "com.bizwak.app",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "permissions": ["INTERNET", "ACCESS_NETWORK_STATE"]
+    },
+    "extra": {
+      "apiBaseUrl": "https://bizwak.co.ke"
+    },
+    "updates": {
+      "fallbackToCacheTimeout": 0
+    },
+    "assetBundlePatterns": ["**/*"]
+  }
+}
+
+Step 6: API Configuration
+Option A: Using app.json
+import Constants from 'expo-constants';
+
+const API_BASE_URL = Constants.expoConfig?.extra?.apiBaseUrl || 'http://localhost:5000';
+export default API_BASE_URL;
+
+Option B: Environment-Based
+const API_BASE_URL = __DEV__ 
+  ? 'http://localhost:5000'
+  : 'https://bizwak.co.ke';
+
+export default API_BASE_URL;
+
+🔨 Building Your APK
+Build for Production (APK)
+eas build -p android --profile production
+
+
+The build process:
+
+Uploads project to EAS
+
+Generates & signs keystore
+
+Builds and signs APK
+
+Provides download link
+
+Duration: ~10–20 mins
+
+Build Profiles
+Type	Command	Description
+Production	eas build -p android --profile production	Full signed APK
+Preview	eas build -p android --profile preview	Internal test build
+Play Store (AAB)	eas build -p android --profile production-aab	For Play Store submission
+📦 Managing Keystore
+Automatic Keystore Management
+
+✅ Automatically generated
+✅ Securely stored on Expo
+✅ Reused across builds
+
+To download manually:
+
+eas credentials
+
+
+Then select:
+
+Android → App → Download credentials
+
+✅ Testing Your APK
+
+Download the APK
+
+Shown after build or via
+
+eas build:list
+
+
+Install on Device
+
+Transfer via USB/cloud and tap Install
+
+Or use ADB:
+
+adb install /path/to/app.apk
+
+
+Test Checklist
+
+App installs and launches
+
+Authentication works
+
+API connects to https://bizwak.co.ke
+
+No console errors
+
+📤 Distribution Options
+Option 1: Direct Download (Simplest)
+
+Host your APK on your server. Example page:
+
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Download Bizwak Mobile App</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+  <h1>📱 Download Bizwak Mobile App</h1>
+  <a href="/downloads/bizwak-v1.0.0.apk">Download APK</a>
+</body>
+</html>
+
+
+Pros: Free, immediate
+Cons: Must allow "Unknown Sources"
+
+Option 2: EAS Update (Over-the-Air)
+
+Push JS updates instantly:
+
+eas update --branch production --message "Bug fixes"
+
+
+✅ No rebuild needed
+❌ Native changes still require new build
+
+Option 3: Firebase App Distribution
+npm install -g firebase-tools
+firebase login
+firebase appdistribution:distribute app.apk --app YOUR_APP_ID --groups "testers"
+
+
+✅ Analytics & Crash reporting
+❌ Requires Firebase setup
+
+Option 4: Google Play Store (Internal Testing)
+eas build -p android --profile production-aab
+
+
+✅ Official distribution
+❌ Requires $25 Google Dev Account
+
+🔄 Updating Your App
+
+Increment version in app.json:
+
+"version": "1.0.1",
+"android": { "versionCode": 2 }
+
+
+Rebuild and distribute.
+
+For OTA updates (JS only):
+
+eas update --branch production --message "UI bug fixes"
+
+🛡️ Security Best Practices
+1. Secure API URLs
+export default {
+  expo: {
+    extra: {
+      apiBaseUrl: process.env.API_BASE_URL || "https://bizwak.co.ke"
+    }
+  }
+};
+
+2. Secure Token Storage
+expo install expo-secure-store
+
+import * as SecureStore from 'expo-secure-store';
+
+await SecureStore.setItemAsync('userToken', token);
+const token = await SecureStore.getItemAsync('userToken');
+
+3. Force HTTPS
+"android": { "usesCleartextTraffic": false }
+
+🐛 Troubleshooting
+Issue	Solution
+Build failed	eas build -p android --profile production --clear-cache
+Invalid credentials	eas logout && eas login
+APK won’t install	Ensure storage space, uninstall old version
+App crash	`adb logcat
+Internet permission error	Add "INTERNET" to permissions
+📊 Build Status
+eas build:list
+eas build:view [BUILD_ID]
+eas build:cancel
+
+💰 EAS Pricing
+Plan	Builds/Month	Priority	Cost
+Free	30	Standard	Free
+Production	60	High	$29/month
+Enterprise	Unlimited	Highest	$199/month
+🎯 Quick Reference Commands
+# Install & Login
+npm install -g eas-cli
+eas login
+
+# Configure
+eas build:configure
+
+# Build APK
+eas build -p android --profile production
+
+# List builds
+eas build:list
+
+✅ Deployment Checklist
+Pre-Build
+
+ Correct package name
+
+ Version updated
+
+ Icon & splash added
+
+ Production API configured
+
+Build
+
+ Logged into EAS
+
+ eas.json set correctly
+
+ Production build successful
+
+Testing
+
+ Installs without errors
+
+ Auth works
+
+ No crashes
+
+Distribution
+
+ Chosen distribution method
+
+ APK uploaded
+
+ Users notified
+
+📚 Additional Resources
+
+EAS Build Docs
+
+EAS Update Docs
+
+Expo App Config
+
+EAS CLI Reference
+
+
+
+
 # React Native Mobile App Deployment Guide
 ## Building and Distributing APK for Android (Non-Play Store)
 

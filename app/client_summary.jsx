@@ -119,10 +119,10 @@ const ClientSummary = () => {
             client.status === 3 ? 'Pending Onboarding' :      // __APPROVEDLEAD
             client.status === 4 ? 'Pending BM Approval' :     // __ONBOARDED
             client.status === 5 ? 'Pending HQ Approval' :     // __CLIENTBMAPPROVED
-            client.status === 6 ? 'Dormant' :                 // __CLIENTHQAPPROVED
+            client.status === 6 ? 'Pending RF' :                 // __CLIENTHQAPPROVED
             client.status === 7 ? 'Appraise' :                // __APPRAISED
             client.status === 8 ? 'Approve Appraisal BM' :    // __APPRAISALBMAPPROVED
-            client.status === 9 ? 'Dormant' :    // __APPRAISALHQAPPROVED
+            client.status === 9 ? 'Pending RF' :    // __APPRAISALHQAPPROVED
             client.status === 10 ? 'Active' :                 // __ACTIVE
             client.status === -1 ? 'Rejected Lead' :          // __REJECTEDLEAD
             client.status === -2 ? 'Rejected Client' :        // __REJECTEDCLIENT
@@ -271,8 +271,8 @@ const ClientSummary = () => {
       return { badge: { backgroundColor: '#FFF8E1' }, text: { color: '#FBC02D' } };
     case 'Pending HQ Approval':
       return { badge: { backgroundColor: '#E8EAF6' }, text: { color: '#3F51B5' } };
-    case 'Dormant':
-      return { badge: { backgroundColor: '#F5F5F5' }, text: { color: '#757575' } };
+    case 'Pending RF':
+      return { badge: { backgroundColor: '#F5F5F5' }, text: { color: '#F57C00' } };
     case 'Active':
       return { badge: { backgroundColor: '#E8F5E9' }, text: { color: '#4CAF50' } };
     case 'Appraise':

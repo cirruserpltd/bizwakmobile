@@ -49,7 +49,7 @@ const actions = () => {
       disbursements: 0,
     },
     actions: [
-      { id: 1, label: 'Add a new lead', icon: 'person-add', color: '#D1F4F7', iconColor: '#00BCD4', borderColor: '#00BCD4', route: '/newlead' },
+      { id: 1, label: 'Add a new Customer', icon: 'person-add', color: '#D1F4F7', iconColor: '#00BCD4', borderColor: '#00BCD4', route: '/newlead' },
       { id: 2, label: 'Allocate lead', icon: 'sync', color: '#D1F4F7', iconColor: '#00BCD4', borderColor: '#00BCD4', count: 0, route: '/client_summary' },
       { id: 3, label: 'Assess Lead', icon: 'document-text', color: '#FFF9E6', iconColor: '#F57C00', borderColor: '#F57C00', count: 0, route: '/client_summary' },
       { id: 4, label: 'Approve Lead', icon: 'alert-circle', color: '#FFEBEE', iconColor: '#C62828', borderColor: '#C62828', count: 0, route: '/client_summary' },
