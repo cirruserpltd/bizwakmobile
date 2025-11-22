@@ -227,69 +227,6 @@ export default function ClientFormScreen() {
     }
   };
 
-  // const fetchClientData = async (id) => {
-  //   try {
-  //     const token = await getAuthToken();
-  //     const response = await fetch(`${API_BASE_URL}/api/mobile/clients/${id}/details`, {
-  //       method: 'GET',
-  //       headers: {
-  //         'Authorization': `Bearer ${token}`,
-  //         'Content-Type': 'application/json',
-  //       },
-  //     });
-  //     const result = await response.json();
-  //     if (result.client) {
-  //       const clientData = result.client;
-  //       setClient(clientData);
-  //       setFormData(prev => ({
-  //         ...prev,
-  //         surname: clientData.name?.split(' ')[0] || '',
-  //         other_names: clientData.name?.split(' ').slice(1).join(' ') || '',
-  //         dob: clientData.dob || '',
-  //         phone: clientData.phone || '',
-  //         alt_phone_no: clientData.alt_phone_no || '',
-  //         id_no: clientData.id_no || '',
-  //         alias: clientData.alias || '',
-  //         branch_id: clientData.branch_id?.toString() || '',
-  //         im_team_id: clientData.im_team_id?.toString() || '',
-  //         gender: clientData.gender || 'Male',
-  //         marital_status: clientData.marital_status || '',
-  //         town: clientData.town || '',
-  //         county: clientData.county || '',
-  //         village: clientData.village || '',
-  //         building_name: clientData.building_name || '',
-  //         floor_no: clientData.floor_no || '',
-  //         door_no: clientData.door_no || '',
-  //         detailed_address: clientData.detailed_address || '',
-  //         requested_amount: clientData.requested_amount?.toString() || '',
-  //         branch_limit: clientData.branch_limit?.toString() || '',
-  //         current_limit: clientData.loan_limit?.toString() || '',
-  //         average_score: clientData.average_score?.toString() || '',
-  //       }));
-  //       if (clientData.next_of_kin) {
-  //         setNextOfKinList([{
-  //           id: 1,
-  //           name: clientData.next_of_kin.name || '',
-  //           location: clientData.next_of_kin.location || '',
-  //           phone: clientData.next_of_kin.phone || '',
-  //           relationship: clientData.next_of_kin.relationship || ''
-  //         }]);
-  //       }
-  //       if (clientData.dependents) {
-  //         setDependants(clientData.dependents);
-  //       }
-  //       if (clientData.home?.household_items) {
-  //         setAssets(clientData.home.household_items);
-  //       }
-  //       if (clientData.onboarding_details?.[0]?.completed_steps) {
-  //         setCompletedSteps(clientData.onboarding_details[0].completed_steps);
-  //       }
-  //     }
-  //   } catch (error) {
-  //     console.error('Error fetching client data:', error);
-  //     Alert.alert('Error', 'Failed to load client data');
-  //   }
-  // };
   const fetchClientData = async (id) => {
     try {
       const token = await getAuthToken();
@@ -510,10 +447,10 @@ export default function ClientFormScreen() {
       // Business Checks - FIXED format with lowercase values
       if (Object.keys(businessChecks).length > 0) {
         const formattedBusinessChecks = {
-          forthcoming: businessChecks.client_forthcoming === 'Yes', // boolean instead of 'yes'/'no'
-          active_sales: businessChecks.active_sales_activities === 'Yes',
-          premises_kept: businessChecks.premises_well_kept === 'Yes',
-          would_lend: businessChecks.would_lend === 'Yes',
+          client_fourthcoming_with_info: businessChecks.client_forthcoming === 'Yes', // Fixed field name
+          presence_of_active_sales: businessChecks.active_sales_activities === 'Yes',
+          premises_well_kept: businessChecks.premises_well_kept === 'Yes',
+          would_you_lend: businessChecks.would_lend === 'Yes',
           any_other_biz_checks_info: businessChecks.any_other_biz_checks_info || 'NONE'
         };
         textFormData.append('business_checks', JSON.stringify(formattedBusinessChecks));
@@ -549,10 +486,10 @@ export default function ClientFormScreen() {
       // Home Checks - FIXED format with lowercase values
       if (Object.keys(homeChecks).length > 0) {
         const formattedHomeChecks = {
-          client_nervous: homeChecks.client_nervous_within_home === 'Yes',
-          proof_ownership: homeChecks.item_persons_proving_ownership === 'Yes',
-          proof_description: homeChecks.item_or_persons_description || '',
-          spouse_aware: homeChecks.spouse_awareness === 'Yes',
+          client_nervous_within_home: homeChecks.client_nervous_within_home === 'Yes',
+          item_persons_proving_ownership: homeChecks.item_persons_proving_ownership === 'Yes',
+          item_or_persons_description: homeChecks.item_or_persons_description || '',
+          spouse_awareness: homeChecks.spouse_awareness === 'Yes',
           suspicious_activity: homeChecks.suspicious_activity === 'Yes',
           any_other_home_checks_info: homeChecks.any_other_home_checks_info || 'none'
         };
@@ -1291,136 +1228,136 @@ export default function ClientFormScreen() {
 
       <Text style={styles.subsectionTitle}>Business Types and Sizes</Text>
 
+
+      <View style={styles.fullInput}>
+        <Text style={styles.label}>Business Name</Text>
+        <TextInput 
+          style={styles.input} 
+          value={formData.business_name}
+          onChangeText={(text) => setFormData({...formData, business_name: text})}
+          placeholder="Enter business name"
+        />
+      </View>
+
       <View style={styles.row}>
-        <View style={styles.halfInput}>
-          <Text style={styles.label}>Business Name</Text>
-          <TextInput 
-            style={styles.input} 
-            value={formData.business_name}
-            onChangeText={(text) => setFormData({...formData, business_name: text})}
-          />
-        </View>
         <View style={styles.halfInput}>
           <Text style={styles.label}>Business Type</Text>
           <TextInput 
             style={styles.input} 
             value={formData.business_type}
             onChangeText={(text) => setFormData({...formData, business_type: text})}
+            placeholder="e.g., shoes plug"
+          />
+        </View>
+        <View style={styles.halfInput}>
+          <Text style={styles.label}>Category</Text>
+          <TextInput 
+            style={styles.input} 
+            value={formData.category}
+            onChangeText={(text) => setFormData({...formData, category: text})}
+            placeholder="e.g., retail"
           />
         </View>
       </View>
 
       <View style={styles.fullInput}>
-        <Text style={styles.label}>Category</Text>
+        <Text style={styles.label}>Average sales/Day (None)</Text>
         <TextInput 
           style={styles.input} 
-          value={formData.category}
-          onChangeText={(text) => setFormData({...formData, category: text})}
+          value={formData.average_sales_day}
+          onChangeText={(text) => setFormData({...formData, average_sales_day: text})}
+          placeholder="Enter average sales per day"
+          keyboardType="numeric"
         />
       </View>
 
-      <Text style={styles.label}>Business Size</Text>
-      <View style={styles.radioGroup}>
-        <TouchableOpacity 
-          style={styles.radioOption}
-          onPress={() => setFormData({...formData, business_size: 'Small'})}
-        >
-          <View style={[styles.radio, formData.business_size === 'Small' && styles.radioSelected]} />
-          <Text style={styles.radioLabel}>Small</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.radioOption}
-          onPress={() => setFormData({...formData, business_size: 'Medium'})}
-        >
-          <View style={[styles.radio, formData.business_size === 'Medium' && styles.radioSelected]} />
-          <Text style={styles.radioLabel}>Medium</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.radioOption}
-          onPress={() => setFormData({...formData, business_size: 'Large'})}
-        >
-          <View style={[styles.radio, formData.business_size === 'Large' && styles.radioSelected]} />
-          <Text style={styles.radioLabel}>Large</Text>
-        </TouchableOpacity>
+      <View style={styles.row}>
+        <View style={styles.halfInput}>
+          <Text style={styles.label}>Registered</Text>
+          <View style={styles.radioGroup}>
+            <TouchableOpacity 
+              style={styles.radioOption}
+              onPress={() => setFormData({...formData, is_registered: 'Yes'})}
+            >
+              <View style={[styles.radio, formData.is_registered === 'Yes' && styles.radioSelected]} />
+              <Text style={styles.radioLabel}>Yes</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.radioOption}
+              onPress={() => setFormData({...formData, is_registered: 'No'})}
+            >
+              <View style={[styles.radio, formData.is_registered === 'No' && styles.radioSelected]} />
+              <Text style={styles.radioLabel}>No</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+        <View style={styles.halfInput}>
+          <Text style={styles.label}>Licensed</Text>
+          <View style={styles.radioGroup}>
+            <TouchableOpacity 
+              style={styles.radioOption}
+              onPress={() => setFormData({...formData, is_licensed: 'Yes'})}
+            >
+              <View style={[styles.radio, formData.is_licensed === 'Yes' && styles.radioSelected]} />
+              <Text style={styles.radioLabel}>Yes</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.radioOption}
+              onPress={() => setFormData({...formData, is_licensed: 'No'})}
+            >
+              <View style={[styles.radio, formData.is_licensed === 'No' && styles.radioSelected]} />
+              <Text style={styles.radioLabel}>No</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </View>
 
-      <Text style={styles.label}>Registered</Text>
-      <View style={styles.radioGroup}>
-        <TouchableOpacity 
-          style={styles.radioOption}
-          onPress={() => setFormData({...formData, is_registered: 'Yes'})}
-        >
-          <View style={[styles.radio, formData.is_registered === 'Yes' && styles.radioSelected]} />
-          <Text style={styles.radioLabel}>Yes</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.radioOption}
-          onPress={() => setFormData({...formData, is_registered: 'No'})}
-        >
-          <View style={[styles.radio, formData.is_registered === 'No' && styles.radioSelected]} />
-          <Text style={styles.radioLabel}>No</Text>
-        </TouchableOpacity>
-      </View>
-
-      <Text style={styles.label}>Licensed</Text>
-      <View style={styles.radioGroup}>
-        <TouchableOpacity 
-          style={styles.radioOption}
-          onPress={() => setFormData({...formData, is_licensed: 'Yes'})}
-        >
-          <View style={[styles.radio, formData.is_licensed === 'Yes' && styles.radioSelected]} />
-          <Text style={styles.radioLabel}>Yes</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.radioOption}
-          onPress={() => setFormData({...formData, is_licensed: 'No'})}
-        >
-          <View style={[styles.radio, formData.is_licensed === 'No' && styles.radioSelected]} />
-          <Text style={styles.radioLabel}>No</Text>
-        </TouchableOpacity>
-      </View>
-
-      <Text style={styles.label}>Any Other Licenses?</Text>
-      <View style={styles.radioGroup}>
-        <TouchableOpacity 
-          style={styles.radioOption}
-          onPress={() => setFormData({...formData, other_licenses: 'Yes'})}
-        >
-          <View style={[styles.radio, formData.other_licenses === 'Yes' && styles.radioSelected]} />
-          <Text style={styles.radioLabel}>Yes</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.radioOption}
-          onPress={() => setFormData({...formData, other_licenses: 'No'})}
-        >
-          <View style={[styles.radio, formData.other_licenses === 'No' && styles.radioSelected]} />
-          <Text style={styles.radioLabel}>No</Text>
-        </TouchableOpacity>
-      </View>
-
-      <Text style={styles.label}>Business ownership</Text>
-      <View style={styles.radioGroup}>
-        <TouchableOpacity 
-          style={styles.radioOption}
-          onPress={() => setFormData({...formData, ownership: 'Sole'})}
-        >
-          <View style={[styles.radio, formData.ownership === 'Sole' && styles.radioSelected]} />
-          <Text style={styles.radioLabel}>Sole</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.radioOption}
-          onPress={() => setFormData({...formData, ownership: 'Partnership'})}
-        >
-          <View style={[styles.radio, formData.ownership === 'Partnership' && styles.radioSelected]} />
-          <Text style={styles.radioLabel}>Partnership</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.radioOption}
-          onPress={() => setFormData({...formData, ownership: 'LimitedCo'})}
-        >
-          <View style={[styles.radio, formData.ownership === 'LimitedCo' && styles.radioSelected]} />
-          <Text style={styles.radioLabel}>LimitedCo</Text>
-        </TouchableOpacity>
+      <View style={styles.row}>
+        <View style={styles.halfInput}>
+          <Text style={styles.label}>Any Other Licenses?</Text>
+          <View style={styles.radioGroup}>
+            <TouchableOpacity 
+              style={styles.radioOption}
+              onPress={() => setFormData({...formData, other_licenses: 'Yes'})}
+            >
+              <View style={[styles.radio, formData.other_licenses === 'Yes' && styles.radioSelected]} />
+              <Text style={styles.radioLabel}>Yes</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.radioOption}
+              onPress={() => setFormData({...formData, other_licenses: 'No'})}
+            >
+              <View style={[styles.radio, formData.other_licenses === 'No' && styles.radioSelected]} />
+              <Text style={styles.radioLabel}>No</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+        <View style={styles.halfInput}>
+          <Text style={styles.label}>Business ownership</Text>
+          <View style={styles.radioGroup}>
+            <TouchableOpacity 
+              style={styles.radioOption}
+              onPress={() => setFormData({...formData, ownership: 'Sole'})}
+            >
+              <View style={[styles.radio, formData.ownership === 'Sole' && styles.radioSelected]} />
+              <Text style={styles.radioLabel}>Sole</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.radioOption}
+              onPress={() => setFormData({...formData, ownership: 'Partnership'})}
+            >
+              <View style={[styles.radio, formData.ownership === 'Partnership' && styles.radioSelected]} />
+              <Text style={styles.radioLabel}>Partnership</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.radioOption}
+              onPress={() => setFormData({...formData, ownership: 'LimitedCo'})}
+            >
+              <View style={[styles.radio, formData.ownership === 'LimitedCo' && styles.radioSelected]} />
+              <Text style={styles.radioLabel}>LimitedCo</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </View>
 
       <TouchableOpacity style={styles.saveButton}>

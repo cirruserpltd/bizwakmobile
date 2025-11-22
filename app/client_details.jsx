@@ -48,7 +48,6 @@ export default function ClientDataScreen() {
     if (member_id) fetchClientDetails();
   }, [member_id]);
 
-  // Helper function to safely get nested values
   const safeGet = (obj, path, defaultValue = 'N/A') => {
     try {
       const value = path.split('.').reduce((current, key) => current?.[key], obj);
@@ -58,7 +57,6 @@ export default function ClientDataScreen() {
     }
   };
 
-  // Helper function to convert yes/no strings to boolean
   const toBool = (value) => {
     if (typeof value === 'boolean') return value;
     if (typeof value === 'string') {
@@ -68,18 +66,9 @@ export default function ClientDataScreen() {
     return false;
   };
 
-  // Helper function to get business type data
   const getBusinessData = () => {
     if (client?.business_types_data && Array.isArray(client.business_types_data) && client.business_types_data.length > 0) {
       return client.business_types_data[0];
-    }
-    return null;
-  };
-
-  // Helper function to get business checks
-  const getBusinessChecks = () => {
-    if (client?.business?.checks) {
-      return client.business.checks;
     }
     return null;
   };
@@ -88,7 +77,6 @@ export default function ClientDataScreen() {
   if (!client) return <Text style={{textAlign: 'center', marginTop: 50}}>No client found.</Text>;
 
   const businessData = getBusinessData();
-  const businessChecks = getBusinessChecks();
 
   return (
     <View style={styles.container}>
@@ -128,13 +116,15 @@ export default function ClientDataScreen() {
           </View>
           
           <View style={styles.infoGrid}>
-            <InfoRow label="ID:" value={client.id_no || 'N/A'} />
+            <InfoRow label="ID NO:" value={client.id_no || 'N/A'} />
             <InfoRow label="Phone:" value={client.phone || 'N/A'} />
-            <InfoRow label="Date of Birth:" value={client.dob || 'N/A'} />
+            <InfoRow label="Alt Phone:" value={client.alt_phone_no || 'N/A'} />
+            <InfoRow label="DOB:" value={client.dob || 'N/A'} />
             <InfoRow label="Gender:" value={client.gender || 'N/A'} />
+            <InfoRow label="Marital status:" value={client.marital_status || 'N/A'} />
             <InfoRow label="Branch:" value={client.branch || 'N/A'} />
             <InfoRow label="Team:" value={client.team || 'N/A'} />
-            <InfoRow label="Joined:" value={client.joined_date || client.created_at || 'N/A'} />
+            <InfoRow label="Date Joined:" value={client.joined_date || client.created_at || 'N/A'} />
           </View>
 
           <Text style={styles.documentsLabel}>DOCUMENTS</Text>
@@ -142,26 +132,31 @@ export default function ClientDataScreen() {
             <DocumentButton icon="eye" label="Profile" />
             <DocumentButton icon="eye" label="ID Front" />
             <DocumentButton icon="eye" label="ID Back" />
+            <DocumentButton icon="eye" label="Signature" />
           </View>
         </View>
 
         {/* Dependents & Next of Kin Card */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <MaterialIcons name="shield" size={20} color="#2196F3" />
+            <MaterialIcons name="people" size={20} color="#2196F3" />
             <Text style={styles.cardTitle}>Dependents & next of kin information</Text>
           </View>
 
-          <Text style={styles.sectionTitle}>Next of Kin</Text>
+          <Text style={styles.sectionTitle}>Next of kin</Text>
           <InfoRow label="Name:" value={safeGet(client, 'next_of_kin.name')} />
           <InfoRow label="Phone:" value={safeGet(client, 'next_of_kin.phone')} />
           <InfoRow label="Physical location:" value={safeGet(client, 'next_of_kin.location')} />
           <InfoRow label="Relationship:" value={safeGet(client, 'next_of_kin.relationship')} />
 
           <Text style={styles.sectionTitle}>Dependents</Text>
-          {client.dependents && client.dependents.length > 0 ? (
+          {client.dependents && client.dependents.length > 0 && client.dependents[0].name ? (
             client.dependents.map((dependent, index) => (
-              <InfoRow key={index} label={`Dependent ${index + 1}:`} value={`${dependent.name || 'N/A'} (Age: ${dependent.age || 'N/A'})`} />
+              <View key={index} style={styles.dependentRow}>
+                <InfoRow label="Name:" value={dependent.name || 'N/A'} />
+                <InfoRow label="Age:" value={dependent.age || 'N/A'} />
+                <InfoRow label="Relationship:" value={dependent.relationship || 'N/A'} />
+              </View>
             ))
           ) : (
             <Text style={styles.infoValue}>No dependents</Text>
@@ -175,81 +170,110 @@ export default function ClientDataScreen() {
             <Text style={styles.cardTitle}>Business Information</Text>
           </View>
 
+          <Text style={styles.sectionSubtitle}>Business type and Size</Text>
           <View style={styles.businessHeader}>
             <View style={styles.businessRow}>
-              <Text style={styles.businessLabel}>Name: <Text style={styles.businessValue}>{businessData?.business_name || 'N/A'}</Text></Text>
               <Text style={styles.businessLabel}>Type: <Text style={styles.businessValue}>{businessData?.business_type || 'N/A'}</Text></Text>
-            </View>
-            <View style={styles.businessRow}>
               <Text style={styles.businessLabel}>Category: <Text style={styles.businessValue}>{businessData?.category || 'N/A'}</Text></Text>
-              <Text style={styles.businessLabel}>Size: <Text style={styles.businessValue}>{businessData?.business_size || 'N/A'}</Text></Text>
             </View>
             <View style={styles.businessRow}>
-              <Text style={styles.businessLabel}>Ownership: <Text style={styles.businessValue}>{businessData?.business_owner || businessData?.ownership || 'N/A'}</Text></Text>
+              <Text style={styles.businessLabel}>Size: <Text style={styles.businessValue}>{businessData?.business_size || 'N/A'}</Text></Text>
+              <Text style={styles.businessLabel}>Ownership: <Text style={styles.businessValue}>{businessData?.business_owner || 'N/A'}</Text></Text>
+            </View>
+            <View style={styles.businessRow}>
               <View style={styles.badges}>
                 <View style={styles.badge}>
-                  <Text style={styles.badgeText}>Reg: {toBool(businessData?.is_registered) ? 'Yes' : 'No'}</Text>
+                  <Text style={styles.badgeText}>Registration: {toBool(businessData?.is_registered) ? 'Yes' : 'No'}</Text>
                 </View>
                 <View style={styles.badge}>
-                  <Text style={styles.badgeText}>Lic: {toBool(businessData?.is_licensed) ? 'Yes' : 'No'}</Text>
+                  <Text style={styles.badgeText}>Licence: {toBool(businessData?.is_licensed) ? 'Yes' : 'No'}</Text>
                 </View>
               </View>
             </View>
           </View>
 
-          {/* Stock Information */}
-          {(client.perishable_stock?.length > 0 || client.non_perishable_stock?.length > 0) && (
+          {/* Perishable Stock */}
+          {client.perishable_stock?.length > 0 && client.perishable_stock[0].stock_name && (
             <View style={styles.stockSection}>
-              <Text style={styles.stockTitle}>Stock Information</Text>
-              
-              {client.perishable_stock?.length > 0 && (
-                <>
-                  <Text style={styles.stockSubtitle}>Perishable Stock</Text>
-                  {client.perishable_stock.map((stock, index) => (
-                    <View key={index} style={styles.stockItem}>
-                      <Text style={styles.stockItemText}>
-                        {stock.stock_name || stock.product_name}: {stock.quantity || 'N/A'} {stock.unit_of_measure || ''} @ {stock.price_per_unit || 'N/A'}
-                      </Text>
-                    </View>
-                  ))}
-                </>
-              )}
-
-              {client.non_perishable_stock?.length > 0 && (
-                <>
-                  <Text style={styles.stockSubtitle}>Non-Perishable Stock</Text>
-                  {client.non_perishable_stock.map((stock, index) => (
-                    <View key={index} style={styles.stockItem}>
-                      <Text style={styles.stockItemText}>
-                        {stock.stock_name || stock.product_name}: {stock.quantity || 'N/A'} {stock.unit_of_measure || ''} @ {stock.price_per_unit || 'N/A'}
-                      </Text>
-                    </View>
-                  ))}
-                </>
-              )}
+              <Text style={styles.stockTitle}>Perishable Stock</Text>
+              <View style={styles.tableHeader}>
+                <Text style={[styles.tableHeaderText, {flex: 2}]}>Name</Text>
+                <Text style={[styles.tableHeaderText, {flex: 1}]}>Quantity</Text>
+                <Text style={[styles.tableHeaderText, {flex: 1}]}>Unit</Text>
+                <Text style={[styles.tableHeaderText, {flex: 1}]}>Price per unit</Text>
+                <Text style={[styles.tableHeaderText, {flex: 1}]}>Value</Text>
+              </View>
+              {client.perishable_stock.map((stock, index) => (
+                <View key={index} style={styles.tableRow}>
+                  <Text style={[styles.tableCell, {flex: 2}]}>{stock.stock_name || 'N/A'}</Text>
+                  <Text style={[styles.tableCell, {flex: 1}]}>{stock.quantity || 'N/A'}</Text>
+                  <Text style={[styles.tableCell, {flex: 1}]}>{stock.unit_of_measure || 'N/A'}</Text>
+                  <Text style={[styles.tableCell, {flex: 1}]}>{stock.price_per_unit || 'N/A'}</Text>
+                  <Text style={[styles.tableCell, {flex: 1}]}>{stock.value || 'N/A'}</Text>
+                </View>
+              ))}
             </View>
           )}
 
-          {/* Business Checks with Yes/No text */}
-          {businessChecks && (
-            <>
-              <Text style={styles.checksTitle}>Business Checks</Text>
-              <YesNoItem text="Client forthcoming with info" value={businessChecks.client_fourthcoming_with_info || businessChecks.client_forthcoming} />
-              <YesNoItem text="Active sales present" value={businessChecks.presence_of_active_sales || businessChecks.active_sales_activities} />
-              <YesNoItem text="Premises well kept" value={businessChecks.premises_well_kept} />
-              <YesNoItem text="Would you lend" value={businessChecks.would_you_lend || businessChecks.would_lend} />
-              {businessChecks.any_other_biz_checks_info && businessChecks.any_other_biz_checks_info !== 'NONE' && (
-                <View style={styles.additionalInfo}>
-                  <Text style={styles.additionalInfoLabel}>Additional Info:</Text>
-                  <Text style={styles.additionalInfoText}>{businessChecks.any_other_biz_checks_info}</Text>
+          {/* Non-Perishable Stock */}
+          {client.non_perishable_stock?.length > 0 && client.non_perishable_stock[0].stock_name && (
+            <View style={styles.stockSection}>
+              <Text style={styles.stockTitle}>Non-Perishable Stock</Text>
+              <View style={styles.tableHeader}>
+                <Text style={[styles.tableHeaderText, {flex: 2}]}>Name</Text>
+                <Text style={[styles.tableHeaderText, {flex: 1}]}>Quantity</Text>
+                <Text style={[styles.tableHeaderText, {flex: 1}]}>Unit</Text>
+                <Text style={[styles.tableHeaderText, {flex: 1}]}>Price per unit</Text>
+                <Text style={[styles.tableHeaderText, {flex: 1}]}>Value</Text>
+              </View>
+              {client.non_perishable_stock.map((stock, index) => (
+                <View key={index} style={styles.tableRow}>
+                  <Text style={[styles.tableCell, {flex: 2}]}>{stock.stock_name || 'N/A'}</Text>
+                  <Text style={[styles.tableCell, {flex: 1}]}>{stock.quantity || 'N/A'}</Text>
+                  <Text style={[styles.tableCell, {flex: 1}]}>{stock.unit_of_measure || 'N/A'}</Text>
+                  <Text style={[styles.tableCell, {flex: 1}]}>{stock.price_per_unit || 'N/A'}</Text>
+                  <Text style={[styles.tableCell, {flex: 1}]}>{stock.value || 'N/A'}</Text>
                 </View>
-              )}
-            </>
+              ))}
+            </View>
           )}
 
+          {/* Business Asset items */}
+          {client.asset_items?.length > 0 && client.asset_items[0].asset_name && (
+            <View style={styles.stockSection}>
+              <Text style={styles.stockTitle}>Business Asset items</Text>
+              <View style={styles.tableHeader}>
+                <Text style={[styles.tableHeaderText, {flex: 2}]}>Name</Text>
+                <Text style={[styles.tableHeaderText, {flex: 1}]}>Quantity</Text>
+                <Text style={[styles.tableHeaderText, {flex: 1}]}>Price per unit</Text>
+                <Text style={[styles.tableHeaderText, {flex: 1}]}>Value</Text>
+                <Text style={[styles.tableHeaderText, {flex: 1}]}>Image</Text>
+              </View>
+              {client.asset_items.map((asset, index) => (
+                <View key={index} style={styles.tableRow}>
+                  <Text style={[styles.tableCell, {flex: 2}]}>{asset.asset_name || 'N/A'}</Text>
+                  <Text style={[styles.tableCell, {flex: 1}]}>{asset.quantity || 'N/A'}</Text>
+                  <Text style={[styles.tableCell, {flex: 1}]}>{asset.price_per_unit || 'N/A'}</Text>
+                  <Text style={[styles.tableCell, {flex: 1}]}>{asset.value || 'N/A'}</Text>
+                  <View style={[styles.tableCell, {flex: 1}]}>
+                    <MaterialIcons name="photo" size={20} color="#2196F3" />
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* Business Checks */}
+          <Text style={styles.checksTitle}>Business Checks</Text>
+          <YesNoItem text="Client forthcoming with info" value={client.business?.checks?.forthcoming} />
+          <YesNoItem text="Presence of active sales" value={client.business?.checks?.active_sales} />
+          <YesNoItem text="Premises well kept" value={client.business?.checks?.premises_kept} />
+          <YesNoItem text="Would you lend" value={client.business?.checks?.would_lend} />
+
+          <Text style={styles.sectionSubtitle}>Business Images</Text>
           <TouchableOpacity style={styles.viewPhotosButton}>
-            <MaterialIcons name="photo-camera" size={20} color="#FF9800" />
-            <Text style={styles.viewPhotosText}>View Business Photos</Text>
+            <MaterialIcons name="photo-camera" size={20} color="#2196F3" />
+            <Text style={styles.viewPhotosText}>Business Front View Picture</Text>
           </TouchableOpacity>
         </View>
 
@@ -260,52 +284,56 @@ export default function ClientDataScreen() {
             <Text style={styles.cardTitle}>Home Information</Text>
           </View>
 
+          <Text style={styles.sectionSubtitle}>Home Details</Text>
           <InfoRow label="Town:" value={client.home?.town || client.town || 'N/A'} />
           <InfoRow label="County:" value={client.home?.county || client.county || 'N/A'} />
-          <InfoRow label="Village/estate:" value={client.home?.village || client.village || 'N/A'} />
-          <InfoRow label="Building:" value={client.home?.building || client.building_name || 'N/A'} />
+          <InfoRow label="Village/Estate:" value={client.home?.village || client.village || 'N/A'} />
+          <InfoRow label="Name Of Building:" value={client.home?.building || client.building_name || 'N/A'} />
           <InfoRow label="Floor:" value={client.home?.floor || client.floor_no || 'N/A'} />
           <InfoRow label="Door No:" value={client.home?.door_no || client.door_no || 'N/A'} />
+          <InfoRow label="Detailed Location Description:" value={client.detailed_address || 'N/A'} />
+          <InfoRow label="GPRS:" value={client.gprs_coordinates || 'N/A'} />
 
-          <Text style={styles.sectionTitle}>HOUSEHOLD ITEMS (Chattels)</Text>
-          {client.assets && client.assets.length > 0 ? (
-            client.assets.map((item, index) => (
-              <View key={index}>
-                <View style={styles.householdItem}>
-                  <View style={styles.householdInfo}>
-                    <Text style={styles.householdName}>{item.asset_name || item.name || 'N/A'}</Text>
-                    <Text style={styles.householdDetails}>Brand: {item.brand_model || item.brand || 'N/A'}</Text>
-                    <Text style={styles.householdDetails}>Serial: {item.serial_no || 'N/A'}</Text>
-                    <Text style={styles.householdDetails}>Condition: {item.condition || 'N/A'}</Text>
-                  </View>
-                  <MaterialIcons name="photo" size={24} color="#FF9800" />
-                </View>
-                <View style={styles.householdValue}>
-                  <Text style={styles.valueLabel}>Value</Text>
-                  <Text style={styles.valueAmount}>KSH {item.value || '0'}</Text>
-                </View>
+          {/* Chattels */}
+          <Text style={styles.sectionSubtitle}>Chattels (Household items pledged as securities)</Text>
+          {client.home?.household_items?.length > 0 && client.home.household_items[0].name ? (
+            <View style={styles.stockSection}>
+              <View style={styles.tableHeader}>
+                <Text style={[styles.tableHeaderText, {flex: 2}]}>Name</Text>
+                <Text style={[styles.tableHeaderText, {flex: 1.5}]}>Brand/Model</Text>
+                <Text style={[styles.tableHeaderText, {flex: 1.5}]}>Serial No</Text>
+                <Text style={[styles.tableHeaderText, {flex: 1.5}]}>Description</Text>
+                <Text style={[styles.tableHeaderText, {flex: 1}]}>Condition</Text>
+                <Text style={[styles.tableHeaderText, {flex: 1}]}>Value</Text>
               </View>
-            ))
+              {client.home.household_items.map((item, index) => (
+                <View key={index} style={styles.tableRow}>
+                  <Text style={[styles.tableCell, {flex: 2}]}>{item.name || 'N/A'}</Text>
+                  <Text style={[styles.tableCell, {flex: 1.5}]}>{item.brand || 'N/A'}</Text>
+                  <Text style={[styles.tableCell, {flex: 1.5}]}>{item.serial || 'N/A'}</Text>
+                  <Text style={[styles.tableCell, {flex: 1.5}]}>{item.description || 'N/A'}</Text>
+                  <Text style={[styles.tableCell, {flex: 1}]}>{item.condition || 'N/A'}</Text>
+                  <Text style={[styles.tableCell, {flex: 1}]}>{item.value || 'N/A'}</Text>
+                </View>
+              ))}
+            </View>
           ) : (
             <Text style={styles.infoValue}>No household items recorded</Text>
           )}
 
           {/* Home Checks */}
-          {client.additional_checks && (
-            <>
-              <Text style={styles.checksTitle}>Home Visit Checks</Text>
-              <YesNoItem text="Client nervous" value={client.additional_checks.client_nervous || client.additional_checks.client_nervous_within_home} />
-              <YesNoItem text="Proof of ownership" value={client.additional_checks.proof_ownership || client.additional_checks.item_persons_proving_ownership} />
-              <YesNoItem text="Spouse aware" value={client.additional_checks.spouse_aware || client.additional_checks.spouse_awareness} />
-              <YesNoItem text="Suspicious activity" value={client.additional_checks.suspicious_activity} />
-              {client.additional_checks.any_other_home_checks_info && client.additional_checks.any_other_home_checks_info !== 'none' && (
-                <View style={styles.additionalInfo}>
-                  <Text style={styles.additionalInfoLabel}>Additional Info:</Text>
-                  <Text style={styles.additionalInfoText}>{client.additional_checks.any_other_home_checks_info}</Text>
-                </View>
-              )}
-            </>
-          )}
+          <Text style={styles.checksTitle}>Home Checks</Text>
+          <YesNoItem text="Client nervous within home" value={client.additional_checks?.client_nervous} />
+          <YesNoItem text="Presence proving home ownership" value={client.additional_checks?.proof_ownership} />
+          <YesNoItem text="Description of the proof" value={client.additional_checks?.proof_description} />
+          <YesNoItem text="Spouse awareness of intention to take loan" value={client.additional_checks?.spouse_aware} />
+          <YesNoItem text="Suspicious activity" value={client.additional_checks?.suspicious_activity} />
+
+          <Text style={styles.sectionSubtitle}>Home Images</Text>
+          <TouchableOpacity style={styles.viewPhotosButton}>
+            <MaterialIcons name="photo-camera" size={20} color="#2196F3" />
+            <Text style={styles.viewPhotosText}>View Home Images</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Agreements Card */}
@@ -315,34 +343,76 @@ export default function ClientDataScreen() {
             <Text style={styles.cardTitle}>Agreements</Text>
           </View>
 
+          <Text style={styles.sectionSubtitle}>Agreement and Afidavit Checks</Text>
           {client.agreements ? (
             <>
-              <YesNoItem text="Willing to sign" value={client.agreements.willing_to_sign || client.agreements.client_willing_to_sign} />
-              <YesNoItem text="Understands terms" value={client.agreements.understands_terms || client.agreements.client_understand_agreement} />
-              <YesNoItem text="Aware of consequences" value={client.agreements.aware_consequences || client.agreements.client_understand_consequences} />
+              <View style={styles.agreementChecks}>
+                <View style={styles.agreementCheckRow}>
+                  <Text style={styles.agreementCheckLabel}>Willing to sign the agreement:</Text>
+                  <Text style={styles.agreementCheckValue}>{toBool(client.agreements.willing_to_sign) ? 'yes' : 'no'}</Text>
+                </View>
+                <View style={styles.agreementCheckRow}>
+                  <Text style={styles.agreementCheckLabel}>Understand the agreement:</Text>
+                  <Text style={styles.agreementCheckValue}>{toBool(client.agreements.understands_terms) ? 'yes' : 'no'}</Text>
+                </View>
+                <View style={styles.agreementCheckRow}>
+                  <Text style={styles.agreementCheckLabel}>Aware of the consequences of agreement breach:</Text>
+                  <Text style={styles.agreementCheckValue}>{toBool(client.agreements.aware_consequences) ? 'yes' : 'no'}</Text>
+                </View>
+              </View>
             </>
           ) : (
             <Text style={styles.infoValue}>No agreement information available</Text>
           )}
 
-          {client.agreements?.guarantor && (
-            <View style={styles.guarantorCard}>
-              <Text style={styles.guarantorTitle}>Loan Guarantor</Text>
-              <InfoRow label="Name:" value={client.agreements.guarantor.name || 'N/A'} />
-              <InfoRow label="ID:" value={client.agreements.guarantor.id || client.agreements.guarantor.id_number || 'N/A'} />
-              <InfoRow label="Phone:" value={client.agreements.guarantor.phone || 'N/A'} />
-              <InfoRow label="Location:" value={client.agreements.guarantor.location || 'N/A'} />
-              <View style={styles.maxAmountRow}>
-                <Text style={styles.infoLabel}>Max Amount:</Text>
-                <Text style={styles.maxAmountValue}>KSH {client.agreements.guarantor.max_amount || '0'}</Text>
-              </View>
-            </View>
-          )}
-
-          <TouchableOpacity style={styles.viewAgreementButton}>
-            <MaterialIcons name="description" size={20} color="#2196F3" />
-            <Text style={styles.viewAgreementText}>View Agreement Documents</Text>
+          <Text style={styles.sectionSubtitle}>Agreement Images</Text>
+          <TouchableOpacity style={styles.viewPhotosButton}>
+            <MaterialIcons name="photo-camera" size={20} color="#2196F3" />
+            <Text style={styles.viewPhotosText}>Client Agreement (Affidavit)</Text>
           </TouchableOpacity>
+
+          {/* Loan Guarantor Declaration */}
+          {client.agreements?.guarantor && client.agreements.guarantor.name && (
+          <>
+            <Text style={styles.sectionSubtitle}>Loan Guarantor Declaration</Text>
+
+            {/* Wrap the table in a horizontal ScrollView */}
+            <ScrollView horizontal={true} showsHorizontalScrollIndicator={true}>
+              <View style={styles.guarantorTable}>
+                <View style={styles.tableHeader}>
+                  <Text style={[styles.tableHeaderText, {flex: 1.5, marginRight: 10}]}>Name</Text>
+                  <Text style={[styles.tableHeaderText, {flex: 1, marginRight: 10}]}>Id No.</Text>
+                  <Text style={[styles.tableHeaderText, {flex: 1, marginRight: 10}]}>Phone No.</Text>
+                  <Text style={[styles.tableHeaderText, {flex: 1.5, marginRight: 10}]}>Residential</Text>
+                  <Text style={[styles.tableHeaderText, {flex: 1, marginRight: 10}]}>Landmark</Text>
+                  <Text style={[styles.tableHeaderText, {flex: 1.5, marginRight: 10}]}>Employment/Business Location</Text>
+                  <Text style={[styles.tableHeaderText, {flex: 1}]}>Maximum Amount</Text>
+                </View>
+
+                <View style={styles.tableRow}>
+                  <Text style={[styles.tableCell, {flex: 1.5}]}>{client.agreements.guarantor.name || 'N/A'}</Text>
+                  <Text style={[styles.tableCell, {flex: 1}]}>{client.agreements.guarantor.id || 'N/A'}</Text>
+                  <Text style={[styles.tableCell, {flex: 1}]}>{client.agreements.guarantor.phone || 'N/A'}</Text>
+                  <Text style={[styles.tableCell, {flex: 1.5}]}>{client.agreements.guarantor.location || 'N/A'}</Text>
+                  <Text style={[styles.tableCell, {flex: 1}]}>{client.agreements.guarantor.landmark || 'N/A'}</Text>
+                  <Text style={[styles.tableCell, {flex: 1.5}]}>{client.agreements.guarantor.business_location || 'N/A'}</Text>
+                  <Text style={[styles.tableCell, {flex: 1}]}>{client.agreements.guarantor.max_amount || 'N/A'}</Text>
+                </View>
+              </View>
+            </ScrollView>
+
+            <Text style={styles.sectionSubtitle}>Agreement Images</Text>
+            <TouchableOpacity style={styles.viewPhotosButton}>
+              <MaterialIcons name="photo-camera" size={20} color="#2196F3" />
+              <Text style={styles.viewPhotosText}>Guarantor Agreement</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.viewPhotosButton}>
+              <MaterialIcons name="photo-camera" size={20} color="#2196F3" />
+              <Text style={styles.viewPhotosText}>Guarantor Signature Img</Text>
+            </TouchableOpacity>
+          </>
+        )}
+
         </View>
 
         <View style={{ height: 20 }} />
@@ -374,11 +444,9 @@ const YesNoItem = ({ text, value }) => {
   return (
     <View style={styles.yesNoItem}>
       <Text style={styles.yesNoText}>{text}</Text>
-      <View style={[styles.yesNoBadge, isYes ? styles.yesBadge : styles.noBadge]}>
-        <Text style={[styles.yesNoValue, isYes ? styles.yesText : styles.noText]}>
-          {isYes ? 'Yes' : 'No'}
-        </Text>
-      </View>
+      <Text style={[styles.yesNoValue, isYes ? styles.yesText : styles.noText]}>
+        {isYes ? 'yes' : 'no'}
+      </Text>
     </View>
   );
 };
@@ -470,6 +538,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     marginBottom: 16,
+    paddingBottom: 8,
+    borderBottomWidth: 2,
+    borderBottomColor: '#2196F3',
   },
   cardTitle: {
     fontSize: 16,
@@ -507,6 +578,7 @@ const styles = StyleSheet.create({
   documentsRow: {
     flexDirection: 'row',
     gap: 8,
+    flexWrap: 'wrap',
   },
   documentButton: {
     flexDirection: 'row',
@@ -528,8 +600,24 @@ const styles = StyleSheet.create({
     marginTop: 16,
     marginBottom: 8,
   },
+  sectionSubtitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666',
+    marginTop: 16,
+    marginBottom: 12,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  dependentRow: {
+    backgroundColor: '#f9f9f9',
+    padding: 12,
+    borderRadius: 4,
+    marginBottom: 8,
+  },
   businessHeader: {
-    backgroundColor: '#FFF8E1',
+    backgroundColor: '#f9f9f9',
     padding: 12,
     borderRadius: 4,
     gap: 8,
@@ -539,6 +627,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 4,
   },
   businessLabel: {
     fontSize: 13,
@@ -550,22 +639,21 @@ const styles = StyleSheet.create({
   },
   badges: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 12,
   },
   badge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
+    backgroundColor: '#E3F2FD',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
   },
   badgeText: {
     fontSize: 12,
-    color: '#000',
+    color: '#2196F3',
+    fontWeight: '600',
   },
   stockSection: {
-    backgroundColor: '#E3F2FD',
-    padding: 12,
-    borderRadius: 4,
-    marginBottom: 12,
+    marginVertical: 12,
   },
   stockTitle: {
     fontSize: 14,
@@ -573,26 +661,37 @@ const styles = StyleSheet.create({
     color: '#000',
     marginBottom: 8,
   },
-  stockSubtitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#2196F3',
-    marginTop: 8,
+  tableHeader: {
+    flexDirection: 'row',
+    backgroundColor: '#f0f0f0',
+    padding: 8,
+    borderRadius: 4,
     marginBottom: 4,
   },
-  stockItem: {
-    paddingVertical: 4,
+  tableHeaderText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#333',
   },
-  stockItemText: {
-    fontSize: 13,
+  tableRow: {
+    flexDirection: 'row',
+    padding: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  tableCell: {
+    fontSize: 12,
     color: '#000',
   },
   checksTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#2196F3',
-    marginTop: 12,
+    color: '#000',
+    marginTop: 16,
     marginBottom: 12,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
   },
   yesNoItem: {
     flexDirection: 'row',
@@ -607,19 +706,6 @@ const styles = StyleSheet.create({
     color: '#000',
     flex: 1,
   },
-  yesNoBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 4,
-    minWidth: 50,
-    alignItems: 'center',
-  },
-  yesBadge: {
-    backgroundColor: '#E8F5E9',
-  },
-  noBadge: {
-    backgroundColor: '#FFEBEE',
-  },
   yesNoValue: {
     fontSize: 14,
     fontWeight: '600',
@@ -630,119 +716,47 @@ const styles = StyleSheet.create({
   noText: {
     color: '#F44336',
   },
-  additionalInfo: {
-    backgroundColor: '#FFF8E1',
-    padding: 12,
-    borderRadius: 4,
-    marginTop: 8,
-  },
-  additionalInfoLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#666',
-    marginBottom: 4,
-  },
-  additionalInfoText: {
-    fontSize: 13,
-    color: '#000',
-  },
   viewPhotosButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#FFF8E1',
+    backgroundColor: '#f9f9f9',
     paddingVertical: 12,
     borderRadius: 4,
     marginTop: 12,
     borderWidth: 1,
-    borderColor: '#FFE0B2',
+    borderColor: '#e0e0e0',
   },
   viewPhotosText: {
-    color: '#FF9800',
+    color: '#2196F3',
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '500',
   },
-  householdItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    backgroundColor: '#FFF8E1',
+  agreementChecks: {
+    backgroundColor: '#f9f9f9',
     padding: 12,
     borderRadius: 4,
-    marginBottom: 8,
+    marginBottom: 12,
   },
-  householdInfo: {
+  agreementCheckRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  agreementCheckLabel: {
+    fontSize: 13,
+    color: '#000',
     flex: 1,
   },
-  householdName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#000',
-    marginBottom: 4,
-  },
-  householdDetails: {
+  agreementCheckValue: {
     fontSize: 13,
-    color: '#666',
-    marginBottom: 2,
-  },
-  householdValue: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: 8,
-  },
-  valueLabel: {
-    fontSize: 14,
-    color: '#666',
-  },
-  valueAmount: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#FF9800',
-  },
-  guarantorCard: {
-    backgroundColor: '#E3F2FD',
-    padding: 12,
-    borderRadius: 4,
-    marginTop: 12,
-    gap: 8,
-  },
-  guarantorTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#2196F3',
-    marginBottom: 8,
-  },
-  maxAmountRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#BBDEFB',
-    marginTop: 4,
-  },
-  maxAmountValue: {
-    fontSize: 16,
     fontWeight: '600',
     color: '#2196F3',
   },
-  viewAgreementButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#E3F2FD',
-    paddingVertical: 12,
-    borderRadius: 4,
-    marginTop: 12,
-    borderWidth: 1,
-    borderColor: '#BBDEFB',
+  guarantorTable: {
+    marginVertical: 12,
   },
-  viewAgreementText: {
-    color: '#2196F3',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-});
+})

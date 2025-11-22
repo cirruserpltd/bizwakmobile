@@ -46,6 +46,22 @@ const LoanDetails = () => {
 
 const fetchCurrentUser = async () => {
   try {
+    // First try to get from AsyncStorage (if stored during login)
+    const storedUser = await AsyncStorage.getItem('user');
+    if (storedUser) {
+      const userData = JSON.parse(storedUser);
+      const userName = userData.name || 
+                      userData.username || 
+                      userData.full_name || 
+                      userData.firstName || 
+                      null;
+      if (userName) {
+        setCurrentUserName(userName);
+        return;
+      }
+    }
+
+    // If not in storage, fetch from API
     const token = await AsyncStorage.getItem('token');
     const response = await fetch(`${API_BASE_URL}/api/users`, {
       headers: {
@@ -54,8 +70,24 @@ const fetchCurrentUser = async () => {
       },
     });
     const data = await response.json();
-    if (data.success) {
-      setCurrentUserName(data.payload.name || 'Admin');
+    console.log('User data response:', data);
+    
+    // Check if payload exists and has data
+    if (data.payload && data.payload.length > 0) {
+      // Payload is an array, get the first user
+      const userPayload = data.payload[0];
+      
+      // Try different possible field names for the user's name
+      const userName = userPayload.name || 
+                      userPayload.username || 
+                      userPayload.full_name || 
+                      userPayload.firstName || 
+                      'Admin';
+      console.log('Setting user name to:', userName);
+      setCurrentUserName(userName);
+    } else {
+      console.log('User payload is empty, using Admin');
+      setCurrentUserName('Admin');
     }
   } catch (error) {
     console.error('Error fetching current user:', error);
@@ -68,10 +100,41 @@ const fetchCurrentUser = async () => {
     setLoading(true);
     const token = await AsyncStorage.getItem('token');
     
-    // Use loan_id if provided, otherwise use member_id
-    const endpoint = loan_id 
-      ? `${API_BASE_URL}/api/loans/${loan_id}`
-      : `${API_BASE_URL}/api/loans/all/${member_id}`;
+    // Always use the specific loan endpoint to get complete data
+    let endpoint;
+    let loanIdToFetch;
+    
+    if (loan_id) {
+      loanIdToFetch = loan_id;
+    } else {
+      // First get all loans to find the active one
+      const allLoansResponse = await fetch(`${API_BASE_URL}/api/loans/all/${member_id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      const allLoansData = await allLoansResponse.json();
+      if (allLoansData.success && allLoansData.payload.length > 0) {
+        const activeLoanData = allLoansData.payload.find(l => 
+          (l.status >= 0 && l.status <= 4) || l.is_active
+        );
+        if (activeLoanData) {
+          loanIdToFetch = activeLoanData.id;
+        }
+      }
+    }
+    
+    if (!loanIdToFetch) {
+      Alert.alert('Error', 'No active loan found');
+      setLoan(null);
+      setLoading(false);
+      return;
+    }
+    
+    // Now fetch the complete loan details
+    endpoint = `${API_BASE_URL}/api/loans/${loanIdToFetch}`;
     
     const response = await fetch(endpoint, {
       headers: {
@@ -84,27 +147,25 @@ const fetchCurrentUser = async () => {
     console.log('Fetched loan data:', data);
 
     if (response.ok && data.success) {
-      if (loan_id) {
-        // Single loan response
-        setLoan({
-          active: data.payload,
-          previous: [],
-        });
-      } else {
-        // Multiple loans response
-        const loans = data.payload || [];
-        const activeLoan = loans.find(l => 
-          (l.status >= 0 && l.status <= 4) || l.is_active
-        );
-        const previousLoans = loans.filter(l => 
-          (l.status < 0 || l.status > 4) && !l.is_active
-        );
-
-        setLoan({
-          active: activeLoan,
-          previous: previousLoans,
-        });
-      }
+      // Fetch previous loans separately if needed
+      const previousLoansResponse = await fetch(`${API_BASE_URL}/api/loans/all/${member_id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      const previousLoansData = await previousLoansResponse.json();
+      const previousLoans = previousLoansData.success 
+        ? previousLoansData.payload.filter(l => 
+            l.id !== loanIdToFetch && ((l.status < 0 || l.status > 4) && !l.is_active)
+          )
+        : [];
+      
+      setLoan({
+        active: data.payload,
+        previous: previousLoans,
+      });
     } else {
       Alert.alert('Error', data.error || 'No loans found');
       setLoan(null);
@@ -615,18 +676,107 @@ const submitDisbursement = async () => {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Approve this loan?</Text>
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Enter approval comments (Optional)"
-              placeholderTextColor="#9E9E9E"
-              multiline
-              numberOfLines={4}
-              value={approvalComment}
-              onChangeText={setApprovalComment}
-              textAlignVertical="top"
-              editable={!submitting}
-            />
+            
+            {/* Client and Loan Details */}
+            <View style={styles.approvalDetailsGrid}>
+              <View style={styles.approvalDetailItem}>
+                <Text style={styles.approvalDetailLabel}>Client's name</Text>
+                <Text style={styles.approvalDetailValue}>
+                  {activeLoan.client_name || 'N/A'}
+                </Text>
+              </View>
+              
+              <View style={styles.approvalDetailItem}>
+                <Text style={styles.approvalDetailLabel}>Client's phone NO.</Text>
+                <Text style={styles.approvalDetailValue}>
+                  {activeLoan.client_phone || 'N/A'}
+                </Text>
+              </View>
+              
+              <View style={styles.approvalDetailItem}>
+                <Text style={styles.approvalDetailLabel}>Branch</Text>
+                <Text style={styles.approvalDetailValue}>
+                  {activeLoan.branch_name || 'N/A'}
+                </Text>
+              </View>
+              
+              <View style={styles.approvalDetailItem}>
+                <Text style={styles.approvalDetailLabel}>Product</Text>
+                <Text style={styles.approvalDetailValue}>
+                  {activeLoan.product_name || 'N/A'}
+                </Text>
+              </View>
+              
+              <View style={styles.approvalDetailItem}>
+                <Text style={styles.approvalDetailLabel}>BDO</Text>
+                <Text style={styles.approvalDetailValue}>
+                  {activeLoan.bdo_name || 'N/A'}
+                </Text>
+              </View>
+            </View>
+
+            {/* Financial Details */}
+            <View style={styles.approvalFinancialGrid}>
+              <View style={styles.approvalFinancialItem}>
+                <Text style={styles.approvalDetailLabel}>Client's requested amnt.</Text>
+                <Text style={styles.approvalDetailValue}>
+                  {parseFloat(activeLoan.requested_amount || 0).toLocaleString('en-US', { 
+                    minimumFractionDigits: 1 
+                  })}
+                </Text>
+              </View>
+              
+              <View style={styles.approvalFinancialItem}>
+                <Text style={styles.approvalDetailLabel}>Amount to be disbursed</Text>
+                <Text style={styles.approvalDetailValue}>
+                  Kes {parseFloat(activeLoan.amount || 0).toLocaleString('en-US', { 
+                    minimumFractionDigits: 1 
+                  })}
+                </Text>
+              </View>
+              
+              <View style={styles.approvalFinancialItem}>
+                <Text style={styles.approvalDetailLabel}>Expected Interest</Text>
+                <Text style={styles.approvalDetailValue}>
+                  {parseFloat(activeLoan.total_interest || 0).toLocaleString('en-US', { 
+                    minimumFractionDigits: 1 
+                  })}
+                </Text>
+              </View>
+              
+              <View style={styles.approvalFinancialItem}>
+                <Text style={styles.approvalDetailLabel}>Loan Period</Text>
+                <Text style={styles.approvalDetailValue}>
+                  {activeLoan.duration_months ? `${activeLoan.duration_months} weeks` : 'N/A'}
+                </Text>
+              </View>
+            </View>
+
+            {/* Approval Comment */}
+            <View style={styles.formGroup}>
+              <Text style={styles.approvalCommentLabel}>Enter approval comment(Optional).</Text>
+              <TextInput
+                style={styles.approvalCommentInput}
+                placeholder="Enter approval comments"
+                placeholderTextColor="#9E9E9E"
+                multiline
+                numberOfLines={4}
+                value={approvalComment}
+                onChangeText={setApprovalComment}
+                textAlignVertical="top"
+                editable={!submitting}
+              />
+            </View>
+
+            {/* Buttons */}
             <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalCancelButton, submitting && styles.buttonDisabled]}
+                onPress={() => setApprovalModalVisible(false)}
+                disabled={submitting}
+              >
+                <Text style={styles.modalCancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.modalApproveButton, submitting && styles.buttonDisabled]}
                 onPress={submitApproval}
@@ -635,23 +785,14 @@ const submitDisbursement = async () => {
                 {submitting ? (
                   <ActivityIndicator color="#fff" size="small" />
                 ) : (
-                  <>
-                    <Ionicons name="checkmark" size={20} color="#fff" />
-                    <Text style={styles.modalApproveButtonText}>Approve</Text>
-                  </>
+                  <Text style={styles.modalApproveButtonText}>Approve loan</Text>
                 )}
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalCancelButton, submitting && styles.buttonDisabled]}
-                onPress={() => setApprovalModalVisible(false)}
-                disabled={submitting}
-              >
-                <Text style={styles.modalCancelButtonText}>Cancel</Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
+
       {/* Disbursement Modal */}
       <Modal
         visible={disbursementModalVisible}
@@ -725,7 +866,9 @@ const submitDisbursement = async () => {
             <View style={styles.formGroup}>
               <Text style={styles.formLabel}>Disbursed by</Text>
               <View style={styles.disabledInput}>
-                <Text style={styles.disabledInputText}>{currentUserName}</Text>
+                <Text style={styles.disabledInputText}>
+                  {currentUserName || 'Loading...'}
+                </Text>
               </View>
             </View>
 
@@ -1148,18 +1291,53 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#212121',
     marginBottom: 20,
-    textAlign: 'center',
+    textAlign: 'left',
   },
-  modalInput: {
+  approvalDetailsGrid: {
+    backgroundColor: '#F5F5F5',
+    padding: 16,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  approvalDetailItem: {
+    marginBottom: 12,
+  },
+  approvalDetailLabel: {
+    fontSize: 12,
+    color: '#5C6BC0',
+    marginBottom: 4,
+    fontWeight: '500',
+  },
+  approvalDetailValue: {
+    fontSize: 14,
+    color: '#212121',
+    fontWeight: '600',
+  },
+  approvalFinancialGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  approvalFinancialItem: {
+    width: '48%',
+    marginBottom: 12,
+  },
+  approvalCommentLabel: {
+    fontSize: 13,
+    color: '#757575',
+    marginBottom: 8,
+    fontWeight: '500',
+  },
+  approvalCommentInput: {
     borderWidth: 1,
     borderColor: '#e0e0e0',
     borderRadius: 8,
     padding: 12,
     fontSize: 14,
-    minHeight: 100,
-    marginBottom: 24,
+    minHeight: 80,
     color: '#212121',
-    backgroundColor: '#fafafa',
+    backgroundColor: '#fff',
   },
   modalButtons: {
     flexDirection: 'row',
@@ -1171,16 +1349,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#2196F3',
     paddingVertical: 14,
     borderRadius: 8,
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
     elevation: 2,
   },
   modalApproveButtonText: {
     color: '#fff',
     fontSize: 14,
     fontWeight: '600',
-    marginLeft: 6,
     letterSpacing: 0.5,
   },
   modalCancelButton: {
@@ -1202,120 +1377,123 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   modalSubtitle: {
-  fontSize: 14,
-  color: '#757575',
-  marginBottom: 20,
-  textAlign: 'center',
-},
-disbursementDetails: {
-  backgroundColor: '#F5F5F5',
-  padding: 16,
-  borderRadius: 8,
-  marginBottom: 20,
-},
-disbursementRow: {
-  flexDirection: 'row',
-  justifyContent: 'space-between',
-  marginBottom: 12,
-},
-disbursementCol: {
-  flex: 1,
-  paddingRight: 8,
-},
-disbursementLabel: {
-  fontSize: 12,
-  color: '#2196F3',
-  marginBottom: 4,
-  fontWeight: '500',
-},
-disbursementValue: {
-  fontSize: 16,
-  color: '#212121',
-  fontWeight: '600',
-},
-formGroup: {
-  marginBottom: 16,
-},
-formLabel: {
-  fontSize: 13,
-  color: '#757575',
-  marginBottom: 8,
-  fontWeight: '500',
-},
-dateInput: {
-  flexDirection: 'row',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  borderWidth: 1,
-  borderColor: '#e0e0e0',
-  borderRadius: 8,
-  padding: 12,
-  backgroundColor: '#fff',
-},
-dateInputText: {
-  fontSize: 14,
-  color: '#212121',
-},
-textInput: {
-  borderWidth: 1,
-  borderColor: '#e0e0e0',
-  borderRadius: 8,
-  padding: 12,
-  fontSize: 14,
-  color: '#212121',
-  backgroundColor: '#fff',
-},
-disabledInput: {
-  borderWidth: 1,
-  borderColor: '#e0e0e0',
-  borderRadius: 8,
-  padding: 12,
-  backgroundColor: '#F5F5F5',
-},
-disabledInputText: {
-  fontSize: 14,
-  color: '#757575',
-},
-modalDisburseButton: {
-  flex: 1,
-  backgroundColor: '#2196F3',
-  paddingVertical: 14,
-  borderRadius: 8,
-  alignItems: 'center',
-  elevation: 2,
-},
-modalDisburseButtonText: {
-  color: '#fff',
-  fontSize: 14,
-  fontWeight: '600',
-  letterSpacing: 0.5,
-},
-datePickerModal: {
-  flex: 1,
-  justifyContent: 'flex-end',
-  backgroundColor: 'rgba(0, 0, 0, 0.5)',
-},
-datePickerContainer: {
-  backgroundColor: '#fff',
-  borderTopLeftRadius: 20,
-  borderTopRightRadius: 20,
-  paddingBottom: 20,
-},
-datePickerHeader: {
-  flexDirection: 'row',
-  justifyContent: 'space-between',
-  padding: 16,
-  borderBottomWidth: 1,
-  borderBottomColor: '#e0e0e0',
-},
-datePickerButton: {
-  fontSize: 16,
-  color: '#2196F3',
-  fontWeight: '600',
-},
-datePickerDone: {
-  color: '#4CAF50',
-},
+    fontSize: 14,
+    color: '#757575',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  disbursementDetails: {
+    backgroundColor: '#F5F5F5',
+    padding: 16,
+    borderRadius: 8,
+    marginBottom: 20,
+  },
+  disbursementRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  disbursementCol: {
+    flex: 1,
+    paddingRight: 8,
+  },
+  disbursementLabel: {
+    fontSize: 12,
+    color: '#2196F3',
+    marginBottom: 4,
+    fontWeight: '500',
+  },
+  disbursementValue: {
+    fontSize: 16,
+    color: '#212121',
+    fontWeight: '600',
+  },
+  formGroup: {
+    marginBottom: 16,
+  },
+  formLabel: {
+    fontSize: 13,
+    color: '#757575',
+    marginBottom: 8,
+    fontWeight: '500',
+  },
+  dateInput: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 8,
+    padding: 12,
+    backgroundColor: '#fff',
+  },
+  dateInputText: {
+    fontSize: 14,
+    color: '#212121',
+  },
+  textInput: {
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 14,
+    color: '#212121',
+    backgroundColor: '#fff',
+  },
+  disabledInput: {
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 8,
+    padding: 12,
+    backgroundColor: '#F5F5F5',
+    minHeight: 45,
+    justifyContent: 'center',
+  },
+  disabledInputText: {
+    fontSize: 14,
+    color: '#424242',
+    fontWeight: '500',
+  },
+  modalDisburseButton: {
+    flex: 1,
+    backgroundColor: '#2196F3',
+    paddingVertical: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+    elevation: 2,
+  },
+  modalDisburseButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+  },
+  datePickerModal: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  datePickerContainer: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: 20,
+  },
+  datePickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  datePickerButton: {
+    fontSize: 16,
+    color: '#2196F3',
+    fontWeight: '600',
+  },
+  datePickerDone: {
+    color: '#4CAF50',
+  },
 });
 
 export default LoanDetails;

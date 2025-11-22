@@ -555,7 +555,6 @@ const LoanManagementForm = ({ navigation, route }) => {
               style={[styles.input, !isEditable && styles.inputDisabled]}
               value={actualLoanLimit}
               onChangeText={setActualLoanLimit}
-              placeholder="Enter actual loan limit"
               keyboardType="numeric"
               editable={isEditable}
             />

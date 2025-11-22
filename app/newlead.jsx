@@ -98,90 +98,91 @@ const NewLead = () => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = async () => {
-    console.log("handleSubmit called");
-    try {
-      const token = await AsyncStorage.getItem("token");
-      console.log("Token being sent:", token);
+  // Key fixes in handleSubmit function:
 
-      if (!token) {
-        alert("You are not logged in. Please login first.");
-        return;
-      }
+const handleSubmit = async () => {
+  console.log("handleSubmit called");
+  try {
+    const token = await AsyncStorage.getItem("token");
+    console.log("Token being sent:", token);
 
-      // Validate required fields
-      if (
-        !formData.surname.trim() ||
-        !formData.other_names.trim() ||
-        !formData.phoneNumber.trim() ||
-        !formData.branch ||
-        !formData.productOfInterest ||
-        !formData.bde
-      ) {
-        alert("Please fill all required fields and select options.");
-        return;
-      }
-
-      const selectedBranch = branches.find(b => String(b.id) === String(formData.branch));
-      const selectedProduct = products.find(p => String(p.id) === String(formData.productOfInterest));
-      console.log("formData.bde value:", formData.bde);
-      console.log("Available BDEs:", bdes.map(b => ({ id: b.id, name: b.name })));
-
-      const selectedBde = bdes.find(b => String(b.id) === String(formData.bde));
-
-      console.log("Matched branch:", selectedBranch);
-      console.log("Matched product:", selectedProduct);
-      console.log("Matched BDE:", selectedBde);
-
-      
-      if (!selectedBranch || !selectedProduct || !selectedBde) {
-        alert("Invalid branch, product, or BDE selection. Please reselect.");
-        return;
-      }
-
-      const payload = {
-        surname: formData.surname.trim(),
-        other_names: formData.other_names.trim(),
-        phone: formData.phoneNumber.trim(),
-        branch_id: selectedBranch.id,
-        product_id: selectedProduct.id,
-        lead_bde: selectedBde.id,
-        location_description: formData.location?.trim() || "",
-        lead_source: formData.leadSource || "Manual", 
-        created_at: formData.date || new Date().toISOString()
-      };
-
-      console.log("Payload being sent:", payload);
-
-      const API_URL = `${API_BASE_URL}/client/new/create-lead`;
-      const response = await fetch(API_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const text = await response.text();
-
-      if (!response.ok) {
-        console.error("Server error:", response.status, text);
-        alert(`Error ${response.status}: Failed to submit lead`);
-        return;
-      }
-
-      const data = JSON.parse(text);
-
-      console.log("Lead created successfully:", data);
-      alert("Lead submitted successfully!");
-      navigation.goBack();
-
-    } catch (error) {
-      console.error("Error submitting lead:", error);
-      alert("Something went wrong. Please try again.");
+    if (!token) {
+      alert("You are not logged in. Please login first.");
+      return;
     }
-  };
+
+    // Validate required fields
+    if (
+      !formData.surname.trim() ||
+      !formData.other_names.trim() ||
+      !formData.phoneNumber.trim() ||
+      !formData.branch ||
+      !formData.productOfInterest ||
+      !formData.bde
+    ) {
+      alert("Please fill all required fields and select options.");
+      return;
+    }
+
+    const selectedBranch = branches.find(b => String(b.id) === String(formData.branch));
+    const selectedProduct = products.find(p => String(p.id) === String(formData.productOfInterest));
+    const selectedBde = bdes.find(b => String(b.id) === String(formData.bde));
+
+    console.log("Matched branch:", selectedBranch);
+    console.log("Matched product:", selectedProduct);
+    console.log("Matched BDE:", selectedBde);
+
+    if (!selectedBranch || !selectedProduct || !selectedBde) {
+      alert("Invalid branch, product, or BDE selection. Please reselect.");
+      return;
+    }
+
+    
+    const fullName = `${formData.surname.trim()} ${formData.other_names.trim()}`;
+
+     const payload = {
+      surname: formData.surname.trim(),
+      other_names: formData.other_names.trim(),
+      phone: formData.phoneNumber.trim(),
+      branch_id: selectedBranch.id,
+      product_id: selectedProduct.id,
+      lead_bde: String(selectedBde.id),  
+      location_description: formData.location?.trim() || "",  
+      lead_source: formData.leadSource || "Manual",
+      created_at: formData.date || new Date().toISOString()
+    };
+
+    console.log("Payload being sent:", payload);
+
+    const API_URL = `${API_BASE_URL}/client/new/create-lead`;
+    const response = await fetch(API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const text = await response.text();
+
+    if (!response.ok) {
+      console.error("Server error:", response.status, text);
+      alert(`Error ${response.status}: Failed to submit lead`);
+      return;
+    }
+
+    const data = JSON.parse(text);
+
+    console.log("Lead created successfully:", data);
+    alert("Lead submitted successfully!");
+    navigation.goBack();
+
+  } catch (error) {
+    console.error("Error submitting lead:", error);
+    alert("Something went wrong. Please try again.");
+  }
+};
 
   // Separate render function for Lead Source dropdown (handles strings instead of objects)
   const renderLeadSourceDropdown = () => (

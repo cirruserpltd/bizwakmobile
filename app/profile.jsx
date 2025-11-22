@@ -469,17 +469,19 @@ const Profile = () => {
         throw new Error('No token found');
       }
 
+      // ✅ Use FormData instead of JSON
+      const formData = new FormData();
+      formData.append('amount', newLoanLimit);
+
       const response = await fetch(
         `${API_BASE_URL}/api/clients/${memberId}/limit`,
         {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
+            // ✅ Remove Content-Type header when using FormData
             'Authorization': `Bearer ${token}`,
           },
-          body: JSON.stringify({
-            loan_limit: parseFloat(newLoanLimit)
-          }),
+          body: formData,  // ✅ Send FormData
         }
       );
 
@@ -491,7 +493,7 @@ const Profile = () => {
       console.log('Set Loan Limit Response:', data);
       
       if (data.success) {
-        Alert.alert('Success', 'Loan limit updated successfully');
+        Alert.alert('Success', data.message || 'Loan limit updated successfully');
         setLoanLimitModalVisible(false);
         setNewLoanLimit('');
         
@@ -1013,10 +1015,9 @@ const ALLOCATION_TYPE_MAP = {
   loan_insurance_fee: 2,
   loan_processing_fee: 3,
   loan_installment: 4,
-  penalty: 5,
+  loan_access_fee: 5,
   default_recovery_fee: 6,
   loan_principal: 7,
-  other_charges: 8,
   interest: 9,
   pre_disbursement_charges: 10,
   pay_loan: 4
@@ -1360,26 +1361,12 @@ const handleSubmitAssessment = async () => {
           <View style={styles.profileInfo}>
             <View style={styles.nameRow}>
               <Text style={styles.customerName}>{customer.name}</Text>
-              <View style={styles.buttonColumn}>
-                <TouchableOpacity
-                  style={styles.detailsButton}
-                  onPress={() => router.push(`/client_details?member_id=${memberId}`)}
-                >
-                  <Text style={styles.detailsButtonText}>Details</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity
-                  style={styles.loanLimitButtonSmall}
-                  onPress={fetchLoanLimit}
-                  disabled={loadingLoanLimit}
-                >
-                  {loadingLoanLimit ? (
-                    <ActivityIndicator size="small" color="#fff" />
-                  ) : (
-                    <Text style={styles.loanLimitButtonText}>Loan Limit</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
+              <TouchableOpacity
+                style={styles.detailsButton}
+                onPress={() => router.push(`/client_details?member_id=${memberId}`)}
+              >
+                <Text style={styles.detailsButtonText}>Details</Text>
+              </TouchableOpacity>
             </View>
             <Text style={styles.phoneNumber}>{customer.phone}</Text>
             <Text style={styles.teamLabel}>Team: {customer.team || 'Not Assigned'}</Text>
@@ -1544,9 +1531,19 @@ const handleSubmitAssessment = async () => {
             <Text style={styles.actionButtonText}>P.A.R(0's)</Text>
           </TouchableOpacity>
           
-          <TouchableOpacity style={[styles.actionButton, styles.loanLimitButton]}>
-            <Ionicons name="trending-up-outline" size={18} color="#fff" />
-            <Text style={styles.actionButtonText}>Loan limit</Text>
+         <TouchableOpacity 
+            style={[styles.actionButton, styles.loanLimitButton]}
+            onPress={fetchLoanLimit}
+            disabled={loadingLoanLimit}
+          >
+            {loadingLoanLimit ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <>
+                <Ionicons name="trending-up-outline" size={18} color="#fff" />
+                <Text style={styles.actionButtonText}>Loan limit</Text>
+              </>
+            )}
           </TouchableOpacity>
           
           <TouchableOpacity style={[styles.actionButton, styles.creditButton]}>
@@ -2744,39 +2741,6 @@ const handleSubmitAssessment = async () => {
                             <TouchableOpacity
                               style={styles.dropdownItem}
                               onPress={() => {
-                                console.log('✅ Selected: pre_disbursement_charges for index:', index);
-                                updateAllocation(index, 'type', 'pre_disbursement_charges');
-                                setActiveAllocationDropdown(null);
-                              }}
-                            >
-                              <Text style={styles.dropdownItemText}>Pre-Disbursement Charges</Text>
-                            </TouchableOpacity>
-                            
-                            <TouchableOpacity
-                              style={styles.dropdownItem}
-                              onPress={() => {
-                                console.log('✅ Selected: loan_processing_fee for index:', index);
-                                updateAllocation(index, 'type', 'loan_processing_fee');
-                                setActiveAllocationDropdown(null);
-                              }}
-                            >
-                              <Text style={styles.dropdownItemText}>Loan Processing Fee</Text>
-                            </TouchableOpacity>
-                            
-                            <TouchableOpacity
-                              style={styles.dropdownItem}
-                              onPress={() => {
-                                console.log('✅ Selected: other_charges for index:', index);
-                                updateAllocation(index, 'type', 'other_charges');
-                                setActiveAllocationDropdown(null);
-                              }}
-                            >
-                              <Text style={styles.dropdownItemText}>Other Charges</Text>
-                            </TouchableOpacity>
-                            
-                            <TouchableOpacity
-                              style={styles.dropdownItem}
-                              onPress={() => {
                                 console.log('✅ Selected: pay_loan for index:', index);
                                 updateAllocation(index, 'type', 'pay_loan');
                                 setActiveAllocationDropdown(null);
@@ -2788,12 +2752,12 @@ const handleSubmitAssessment = async () => {
                             <TouchableOpacity
                               style={styles.dropdownItem}
                               onPress={() => {
-                                console.log('✅ Selected: penalty for index:', index);
-                                updateAllocation(index, 'type', 'penalty');
+                                console.log('✅ Selected: loan_access_fee for index:', index);
+                                updateAllocation(index, 'type', 'loan_access_fee');
                                 setActiveAllocationDropdown(null);
                               }}
                             >
-                              <Text style={styles.dropdownItemText}>Penalty</Text>
+                              <Text style={styles.dropdownItemText}>Loan Access Fee (For a Pending Top-Up)</Text>
                             </TouchableOpacity>
                           </>
                         )}
@@ -3838,24 +3802,6 @@ createLoanButtonSmall: {
   paddingHorizontal: 12,
   paddingVertical: 6,
   borderRadius: 4,
-},
-
-buttonColumn: {
-  flexDirection: 'column',
-  gap: 6,
-},
-loanLimitButtonSmall: {
-  backgroundColor: '#2196F3',
-  paddingHorizontal: 12,
-  paddingVertical: 4,
-  borderRadius: 4,
-  alignItems: 'center',
-  minWidth: 70,
-},
-loanLimitButtonText: {
-  color: '#fff',
-  fontSize: 12,
-  fontWeight: '600',
 },
 loanLimitModalOverlay: {
   flex: 1,
