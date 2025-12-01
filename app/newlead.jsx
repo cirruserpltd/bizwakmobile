@@ -265,7 +265,11 @@ const handleSubmit = async () => {
         <Text style={styles.headerTitle}>Add Customer</Text>
       </View>
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.scrollView} 
+        contentContainerStyle={styles.scrollViewContent}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.inputContainer}>
           <Text style={styles.label}>Surname</Text>
           <TextInput
@@ -335,7 +339,8 @@ const styles = StyleSheet.create({
   backButton: { marginRight: 15 },
   backIcon: { color: '#FFF', fontSize: 24, fontWeight: '600' },
   headerTitle: { color: '#FFF', fontSize: 18, fontWeight: '600' },
-  scrollView: { flex: 1, padding: 20 },
+  scrollView: { flex: 1 },
+  scrollViewContent: { padding: 20, paddingBottom: 120 },
   inputContainer: { marginBottom: 20 },
   label: { fontSize: 14, fontWeight: '600', color: '#333', marginBottom: 8 },
   input: { backgroundColor: '#FFF', borderWidth: 1, borderColor: '#E0E0E0', borderRadius: 8, paddingHorizontal: 15, paddingVertical: 12, fontSize: 14, color: '#333' },
@@ -349,7 +354,7 @@ const styles = StyleSheet.create({
   pickerContainer: { backgroundColor: '#FFF', borderWidth: 1, borderColor: '#E0E0E0', borderRadius: 8, marginTop: 5, maxHeight: 200 },
   pickerItem: { paddingHorizontal: 15, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F0F0F0' },
   pickerItemText: { fontSize: 14, color: '#333' },
-  submitButton: { backgroundColor: '#4A90E2', borderRadius: 8, paddingVertical: 15, alignItems: 'center', marginTop: 10, marginBottom: 30 },
+  submitButton: { backgroundColor: '#4A90E2', borderRadius: 8, paddingVertical: 15, alignItems: 'center', marginTop: 10 },
   submitButtonText: { color: '#FFF', fontSize: 16, fontWeight: '600' },
 });
 

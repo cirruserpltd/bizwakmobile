@@ -77,7 +77,7 @@ const LoanManagementForm = ({ navigation, route }) => {
     setLoading(true);
     try {
       const token = await AsyncStorage.getItem('token');
-      console.log('🔑 Token:', token);
+      console.log('Token:', token);
 
       // --- Fetch available credit ---
       const creditResponse = await axios.get(
@@ -364,7 +364,11 @@ const LoanManagementForm = ({ navigation, route }) => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.content}>
+      <ScrollView 
+        style={styles.content}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Form Header */}
         <View style={styles.formHeader}>
           <Text style={styles.formTitle}>
@@ -659,6 +663,9 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 120,
   },
   formHeader: {
     flexDirection: 'row',

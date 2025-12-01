@@ -2103,7 +2103,12 @@ const handleSubmitAssessment = async () => {
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+           <ScrollView 
+              style={styles.modalBody} 
+              showsVerticalScrollIndicator={true}  
+              contentContainerStyle={styles.modalScrollContent}  
+              bounces={true}  
+            >
               {/* Surname Name */}
               <Text style={styles.inputLabel}>Surname Name</Text>
               <View style={styles.inputContainer}>
@@ -3447,7 +3452,11 @@ const styles = StyleSheet.create({
   },
   modalBody: {
     padding: 16,
+    paddingBottom: 0,
   },
+  modalScrollContent: {  
+  paddingBottom: 100,
+},
   dropdownLabel: {
     fontSize: 16,
     fontWeight: '600',
@@ -3509,7 +3518,7 @@ const styles = StyleSheet.create({
   backgroundColor: '#fff',
   borderRadius: 16,
   width: '90%',
-  maxHeight: '85%',
+  maxHeight: '90%',
   overflow: 'hidden',
   },
   inputLabel: {
@@ -3614,7 +3623,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
     marginTop: 16,
-    marginBottom: 24,
+    marginBottom: 40,
   },
   submitButtonText: {
     color: '#fff',
