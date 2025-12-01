@@ -8,22 +8,34 @@
       "distribution": "internal",
       "android": {
         "gradleCommand": ":app:assembleDebug"
+      },
+      "env": {
+        "API_BASE_URL": "https://bizwak.co.ke"
       }
     },
     "preview": {
       "distribution": "internal",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "API_BASE_URL": "https://bizwak.co.ke"
       }
     },
     "production": {
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "API_BASE_URL": "https://bizwak.co.ke"
       }
     },
     "production-aab": {
       "android": {
         "buildType": "app-bundle"
+      },
+      "env": {
+        "API_BASE_URL": "https://bizwak.co.ke"
       }
     }
   },

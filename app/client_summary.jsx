@@ -113,24 +113,26 @@ const ClientSummary = () => {
           name: client.name || 'N/A',
           phone: client.phone || 'N/A',
           status: 
-            client.status === 0 ? 'Pending Allocation' :      // __NEWLEAD
-            client.status === 1 ? 'Pending Assessment' :      // __ALLOCATEDLEAD
-            client.status === 2 ? 'Pending Approval' :        // __ASSESSEDLEAD
-            client.status === 3 ? 'Pending Onboarding' :      // __APPROVEDLEAD
-            client.status === 4 ? 'Pending BM Approval' :     // __ONBOARDED
-            client.status === 5 ? 'Pending HQ Approval' :     // __CLIENTBMAPPROVED
-            client.status === 6 ? 'Pending RF' :                 // __CLIENTHQAPPROVED
-            client.status === 7 ? 'Appraise' :                // __APPRAISED
-            client.status === 8 ? 'Approve Appraisal BM' :    // __APPRAISALBMAPPROVED
-            client.status === 9 ? 'Pending RF' :    // __APPRAISALHQAPPROVED
-            client.status === 10 ? 'Active' :                 // __ACTIVE
-            client.status === -1 ? 'Rejected Lead' :          // __REJECTEDLEAD
-            client.status === -2 ? 'Rejected Client' :        // __REJECTEDCLIENT
-            client.status === -3 ? 'Rejected Appraisal' :     // __REJECTEDAPPRAISAL
-            client.status === -4 ? 'Blacklisted' :            // BLACKLISTED
+            client.status === 0 ? 'Pending Allocation' :
+            client.status === 1 ? 'Pending Assessment' :
+            client.status === 2 ? 'Pending Approval' :
+            client.status === 3 ? 'Pending Onboarding' :
+            client.status === 4 ? 'Pending BM Approval' :
+            client.status === 5 ? 'Pending HQ Approval' :
+            client.status === 6 ? 'Pending Appraisal' :       
+            client.status === 7 ? 'Pending Appraisal (BM)' : 
+            client.status === 8 ? 'Pending Appraisal (HQ)' :   
+            client.status === 9 ? 'Pending RF' :
+            client.status === 10 ? 'Dormant' :                 
+            client.status === 11 ? 'Active' :                 
+            client.status === -1 ? 'Rejected Lead' :
+            client.status === -2 ? 'Rejected Client' :
+            client.status === -3 ? 'Rejected Appraisal' :
+            client.status === -4 ? 'Blacklisted' :
             'Unknown',
           statusValue: client.status,
         }));
+
         
         setLeads(transformedLeads);
         setFilteredLeads(transformedLeads);

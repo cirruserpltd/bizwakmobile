@@ -104,6 +104,17 @@ const Profile = () => {
   const [loadingLoanLimit, setLoadingLoanLimit] = useState(false);
   const [newLoanLimit, setNewLoanLimit] = useState('');
   const [showBalanceDueToday, setShowBalanceDueToday] = useState(false);
+  const [amntBalForTopup, setAmntBalForTopup] = useState(0);
+  const [cumulativeTotals, setCumulativeTotals] = useState({
+  totalPrincipal: 0,
+  totalRepayable: 0,
+  totalPaid: 0,
+  totalBalance: 0,
+  totalDueToday: 0
+});
+const [requiredPaymentForTopup, setRequiredPaymentForTopup] = useState(0);
+const [availableCredit, setAvailableCredit] = useState(0);
+const [activeLoansCount, setActiveLoansCount] = useState(0);
 
   
 
@@ -152,7 +163,11 @@ const Profile = () => {
     'Pending Onboarding': 'Onboard',
     'Pending BM Approval': 'BM Approval',
     'Pending HQ Approval': 'HQ Approval',
+    'Pending Appraisal': 'Appraise',              // ✅ Added
+    'Pending Appraisal (BM)': 'Approve Appraisal', // ✅ Added
+    'Pending Appraisal (HQ)': 'Approve Appraisal', // ✅ Added
     'Pending RF': 'Receive RF',
+    'Dormant': 'Create Loan',
     'Active': 'Create Loan',
   };
   return buttonTextMap[status] || status;
@@ -173,8 +188,10 @@ const Profile = () => {
   } else if (customer.status === 'Pending HQ Approval') {
     setHqApprovalModalVisible(true);
   } else if (customer.status === 'Pending RF') {
-    setIsMembershipFeePayment(true); // Pending RF = membership fee only
+    setIsMembershipFeePayment(true);
     setPaymentModalVisible(true);
+  } else if (customer.status === 'Dormant' || customer.status === 'Active') {
+    router.push(`/create_loan?client_id=${memberId}`);
   } else {
     Alert.alert('Action', `Perform action for status: ${customer.status}`);
   }
@@ -184,7 +201,8 @@ const Profile = () => {
   useEffect(() => {
     if (memberId) {
       fetchCustomerProfile();
-      fetchLoans();
+      //fetchLoans();
+      fetchLoanSummaryData();
       fetchDisbursements();
     } else {
       setError('No member ID provided');
@@ -284,23 +302,23 @@ const Profile = () => {
         branch: data.teams && data.teams[0]?.branch?.name ? data.teams[0].branch.name : 'N/A',
         status: (() => {
           const statusMap = {
-            0: 'Pending Allocation',          // __NEWLEAD
-            1: 'Pending Assessment',          // __ALLOCATEDLEAD
-            2: 'Pending Approval',            // __ASSESSEDLEAD
-            3: 'Pending Onboarding',          // __APPROVEDLEAD
-            4: 'Pending BM Approval',         // __ONBOARDED
-            5: 'Pending HQ Approval',         // __CLIENTBMAPPROVED
-            6: 'Pending RF',                     // __CLIENTHQAPPROVED
-            7: 'Appraise',                    // __APPRAISED
-            8: 'Approve Appraisal (BM)',      // __APPRAISALBMAPPROVED
-            9: 'Pending RF',      // __APPRAISALHQAPPROVED
-            10: 'Active',                     // __ACTIVE
-            '-1': 'Rejected Lead',            // __REJECTEDLEAD
-            '-2': 'Rejected Client',          // __REJECTEDCLIENT
-            '-3': 'Rejected Appraisal',       // __REJECTEDAPPRAISAL
-            '-4': 'Blacklisted',              // BLACKLISTED
+            0: 'Pending Allocation',
+            1: 'Pending Assessment',
+            2: 'Pending Approval',
+            3: 'Pending Onboarding',
+            4: 'Pending BM Approval',
+            5: 'Pending HQ Approval',
+            6: 'Pending Appraisal',              
+            7: 'Pending Appraisal (BM)',         
+            8: 'Pending Appraisal (HQ)',         
+            9: 'Pending RF',
+            10: 'Dormant',                       
+            11: 'Active',                        
+            '-1': 'Rejected Lead',
+            '-2': 'Rejected Client',
+            '-3': 'Rejected Appraisal',
+            '-4': 'Blacklisted',
           };
-          //  console.log('Mapping status:', data.client.status, '→', statusMap[data.client.status]);
           return statusMap[data.client.status] || 'Unknown Status';
         })(),
         loans: {
@@ -344,11 +362,15 @@ const Profile = () => {
       setCustomer(mappedCustomer);
       
       // Set teams for dropdown
+      // if (data.teams && Array.isArray(data.teams)) {
+      //   const teamNames = data.teams.map(team => 
+      //     typeof team === 'string' ? team : (team.name || team.team_name || team)
+      //   );
+      //   setTeams(teamNames);
+      // }
+      // In fetchCustomerProfile, replace lines ~223-228 with:
       if (data.teams && Array.isArray(data.teams)) {
-        const teamNames = data.teams.map(team => 
-          typeof team === 'string' ? team : (team.name || team.team_name || team)
-        );
-        setTeams(teamNames);
+        setTeams(data.teams); // ✅ Store the full team objects
       }
       
       // Set users for BDE dropdown
@@ -370,47 +392,47 @@ const Profile = () => {
     }
   };
 
-  const fetchLoans = async () => {
-  try {
-    setLoadingLoans(true);
-    const token = await AsyncStorage.getItem('token');
+//   const fetchLoans = async () => {
+//   try {
+//     setLoadingLoans(true);
+//     const token = await AsyncStorage.getItem('token');
     
-    if (!token) {
-      throw new Error('No token found');
-    }
+//     if (!token) {
+//       throw new Error('No token found');
+//     }
 
-    const response = await fetch(
-      `${API_BASE_URL}/api/loans/all/${memberId}`,
-      {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-      }
-    );
+//     const response = await fetch(
+//       `${API_BASE_URL}/api/loans/all/${memberId}`,
+//       {
+//         method: 'GET',
+//         headers: {
+//           'Content-Type': 'application/json',
+//           'Authorization': `Bearer ${token}`,
+//         },
+//       }
+//     );
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
+//     if (!response.ok) {
+//       throw new Error(`HTTP error! status: ${response.status}`);
+//     }
 
-    const data = await response.json();
-    console.log("Loans payload:", data.payload);
+//     const data = await response.json();
+//     console.log("Loans payload:", data.payload);
 
     
-    if (data.success && data.payload) {
-      setLoans(data.payload);
-    } else {
-      setLoans([]);
-    }
+//     if (data.success && data.payload) {
+//       setLoans(data.payload);
+//     } else {
+//       setLoans([]);
+//     }
     
-  } catch (err) {
-    console.error('Error fetching loans:', err);
-    Alert.alert('Error', `Failed to load loans: ${err.message}`);
-  } finally {
-    setLoadingLoans(false);
-  }
-};
+//   } catch (err) {
+//     console.error('Error fetching loans:', err);
+//     Alert.alert('Error', `Failed to load loans: ${err.message}`);
+//   } finally {
+//     setLoadingLoans(false);
+//   }
+// };
 
  const fetchLoanLimit = async () => {
   try {
@@ -552,12 +574,169 @@ const fetchDisbursements = async (page = 1) => {
     setLoadingDisbursements(false);
   }
 };
+const fetchLoanSummaryData = async () => {
+  try {
+    setLoadingLoans(true);
+    const token = await AsyncStorage.getItem('token');
+    
+    if (!token) {
+      throw new Error('No token found');
+    }
 
- const calculateLoanSummary = () => {
+    const response = await fetch(
+      `${API_BASE_URL}/api/loans/client-summary-with-calculations/${memberId}`,
+      {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log("Loan Summary Data:", data);
+
+    if (data.success && data.payload) {
+      // Set all the state from one API call
+      setCumulativeTotals(data.payload.cumulative_totals || {
+        totalPrincipal: 0,
+        totalRepayable: 0,
+        totalPaid: 0,
+        totalBalance: 0,
+        totalDueToday: 0
+      });
+      setRequiredPaymentForTopup(data.payload.required_payment_for_topup || 0);
+      setAvailableCredit(data.payload.available_credit || 0);
+      setActiveLoansCount(data.payload.active_loans_count || 0);
+      setLoans(data.payload.all_loans || []);
+    }
+    
+  } catch (err) {
+    console.error('Error fetching loan summary:', err);
+    Alert.alert('Error', `Failed to load loan summary: ${err.message}`);
+  } finally {
+    setLoadingLoans(false);
+  }
+};
+
+//  const calculateLoanSummary = () => {
+//   if (!loans || loans.length === 0) {
+//     return {
+//       noOfLoans: 0,
+//       loanLimit: 'Ksh 0 per product',
+//       loanPrincipal: 'Ksh 0',
+//       dateDisbursed: '-',
+//       loanDueDate: '-',
+//       repayableAmount: 'Ksh 0',
+//       totalPaid: 'Ksh 0',
+//       totalBalance: 'Ksh 0',
+//       balanceDueToday: 'Ksh 0',
+//       availableTopUp: 'Ksh 0',
+//     };
+//   }
+
+//   const totalPrincipal = loans.reduce((sum, loan) => sum + (loan.amount || 0), 0);
+//   const totalBalance = loans.reduce((sum, loan) => sum + (loan.il_balance_due || loan.outstanding_balance || 0), 0);
+//   const totalPaid = loans.reduce((sum, loan) => sum + (loan.total_amount_paid || 0), 0);
+//   const totalRepayable = loans.reduce((sum, loan) => sum + (loan.repayable_amount || 0), 0);
+
+//   const disbursedLoans = loans.filter(loan => loan.disbursed_at);
+//   const latestDisbursement = disbursedLoans.length > 0
+//     ? new Date(Math.max(...disbursedLoans.map(loan => new Date(loan.disbursed_at))))
+//     : null;
+
+//   const loansWithDueDate = loans.filter(loan => loan.next_due_date);
+//   const nearestDueDate = loansWithDueDate.length > 0
+//     ? new Date(Math.min(...loansWithDueDate.map(loan => new Date(loan.next_due_date))))
+//     : null;
+
+//   const balanceDueToday = loans.reduce((sum, loan) => sum + (loan.amount_due_today || 0), 0);
+
+//   return {
+//     noOfLoans: loans.length,
+//     loanLimit: customer?.loans?.loanLimit || 'Ksh 0 per product',
+//     loanPrincipal: `Ksh ${totalPrincipal.toLocaleString()}`,
+//     dateDisbursed: latestDisbursement ? latestDisbursement.toLocaleDateString() : '-',
+//     loanDueDate: nearestDueDate ? nearestDueDate.toLocaleDateString() : '-',
+//     repayableAmount: `Ksh ${totalRepayable.toLocaleString()}`,
+//     totalPaid: `Ksh ${totalPaid.toLocaleString()}`,
+//     totalBalance: `Ksh ${totalBalance.toLocaleString()}`,
+//     balanceDueToday: ` ${Math.round(balanceDueToday).toLocaleString()}`,
+//     availableTopUp: customer?.loans?.availableTopUp || 'Ksh 0',
+//   };
+// };
+
+
+
+  // const handleAllocate = async () => {
+  //   try {
+  //     const token = await AsyncStorage.getItem('token');
+
+  //   console.log('=== ALLOCATION REQUEST ===');
+  //   console.log('Selected Team:', selectedTeam);
+  //   console.log('Selected BDE:', selectedBDE);
+    
+  //   // Use FormData to match your backend expectation
+  //   const formData = new FormData();
+  //   formData.append('team_id', selectedTeam);
+    
+  //   // ONLY append bde_id if it's actually selected
+  //   if (selectedBDE && selectedBDE.trim() !== '') {
+  //     formData.append('bde_id', selectedBDE);
+  //     console.log('Adding bde_id to request:', selectedBDE);
+  //   } else {
+  //     console.log('No BDE selected, not sending bde_id');
+  //   }
+      
+  //     const response = await fetch(
+  //       `${API_BASE_URL}/api/clients/${memberId}/allocate`, 
+  //       {
+  //         method: 'POST',
+  //         headers: {
+  //           'Content-Type': 'application/json',
+  //           'Authorization': `Bearer ${token}`,
+  //         },
+  //         body: JSON.stringify({
+  //           team_id: selectedTeam,
+  //           bde_id: selectedBDE,
+  //         }),
+  //       }
+  //     );
+
+  //     if (!response.ok) {
+  //       throw new Error('Failed to allocate customer');
+  //     }
+
+  //     const result = await response.json();
+
+  //     // Update local state
+  //     setCustomer({
+  //       ...customer,
+  //       status: 'Pending Assessment',
+  //       team: selectedTeam,
+  //     });
+      
+  //     setModalVisible(false);
+  //     setSelectedTeam('');
+  //     setSelectedBDE('');
+      
+  //     Alert.alert('Success', 'Customer allocated successfully');
+      
+  //   } catch (err) {
+  //     Alert.alert('Error', `Failed to allocate customer: ${err.message}`);
+  //     console.error('Error allocating customer:', err);
+  //   }
+  // };
+const calculateLoanSummary = () => {
   if (!loans || loans.length === 0) {
     return {
       noOfLoans: 0,
-      loanLimit: 'Ksh 0 per product',
+      loanLimit: customer?.loans?.loanLimit || 'Ksh 0 per product',
       loanPrincipal: 'Ksh 0',
       dateDisbursed: '-',
       loanDueDate: '-',
@@ -565,15 +744,12 @@ const fetchDisbursements = async (page = 1) => {
       totalPaid: 'Ksh 0',
       totalBalance: 'Ksh 0',
       balanceDueToday: 'Ksh 0',
+      amntBalForTopup: 'Ksh 0',
       availableTopUp: 'Ksh 0',
     };
   }
 
-  const totalPrincipal = loans.reduce((sum, loan) => sum + (loan.amount || 0), 0);
-  const totalBalance = loans.reduce((sum, loan) => sum + (loan.il_balance_due || loan.outstanding_balance || 0), 0);
-  const totalPaid = loans.reduce((sum, loan) => sum + (loan.total_amount_paid || 0), 0);
-  const totalRepayable = loans.reduce((sum, loan) => sum + (loan.repayable_amount || 0), 0);
-
+  // Get latest disbursement and nearest due date from loans
   const disbursedLoans = loans.filter(loan => loan.disbursed_at);
   const latestDisbursement = disbursedLoans.length > 0
     ? new Date(Math.max(...disbursedLoans.map(loan => new Date(loan.disbursed_at))))
@@ -584,68 +760,108 @@ const fetchDisbursements = async (page = 1) => {
     ? new Date(Math.min(...loansWithDueDate.map(loan => new Date(loan.next_due_date))))
     : null;
 
-  const balanceDueToday = loans.reduce((sum, loan) => sum + (loan.amount_due_today || 0), 0);
-
   return {
-    noOfLoans: loans.length,
+    noOfLoans: activeLoansCount,
     loanLimit: customer?.loans?.loanLimit || 'Ksh 0 per product',
-    loanPrincipal: `Ksh ${totalPrincipal.toLocaleString()}`,
+    loanPrincipal: `Ksh ${(cumulativeTotals.totalPrincipal || 0).toLocaleString()}`,
     dateDisbursed: latestDisbursement ? latestDisbursement.toLocaleDateString() : '-',
     loanDueDate: nearestDueDate ? nearestDueDate.toLocaleDateString() : '-',
-    repayableAmount: `Ksh ${totalRepayable.toLocaleString()}`,
-    totalPaid: `Ksh ${totalPaid.toLocaleString()}`,
-    totalBalance: `Ksh ${totalBalance.toLocaleString()}`,
-    balanceDueToday: ` ${Math.round(balanceDueToday).toLocaleString()}`,
-    availableTopUp: customer?.loans?.availableTopUp || 'Ksh 0',
+    repayableAmount: `Ksh ${(cumulativeTotals.totalRepayable || 0).toLocaleString()}`,
+    totalPaid: `Ksh ${(cumulativeTotals.totalPaid || 0).toLocaleString()}`,
+    totalBalance: `Ksh ${(cumulativeTotals.totalBalance || 0).toLocaleString()}`,
+    balanceDueToday: `${Math.round(cumulativeTotals.totalDueToday || 0).toLocaleString()}`,
+    amntBalForTopup: `Ksh ${Math.round(requiredPaymentForTopup || 0).toLocaleString()}`, // ✅ NEW
+    availableTopUp: `Ksh ${Math.round(availableCredit || 0).toLocaleString()}`, // ✅ UPDATED
   };
 };
-
-
-
   const handleAllocate = async () => {
-    try {
-      const token = await AsyncStorage.getItem('token');
-      
-      const response = await fetch(
-        `${API_BASE_URL}/api/clients/${memberId}/allocate`, 
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            team_id: selectedTeam,
-            bde_id: selectedBDE,
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error('Failed to allocate customer');
-      }
-
-      const result = await response.json();
-
-      // Update local state
-      setCustomer({
-        ...customer,
-        status: 'Pending Assessment',
-        team: selectedTeam,
-      });
-      
-      setModalVisible(false);
-      setSelectedTeam('');
-      setSelectedBDE('');
-      
-      Alert.alert('Success', 'Customer allocated successfully');
-      
-    } catch (err) {
-      Alert.alert('Error', `Failed to allocate customer: ${err.message}`);
-      console.error('Error allocating customer:', err);
+  try {
+    const token = await AsyncStorage.getItem('token');
+    
+    console.log('=== ALLOCATION REQUEST ===');
+    console.log('Selected Team Object:', selectedTeam);
+    console.log('Selected BDE:', selectedBDE);
+    
+    // Extract team ID from the stored team object
+    const teamId = typeof selectedTeam === 'object' && selectedTeam !== null
+      ? selectedTeam.id
+      : selectedTeam; // Fallback if it's just an ID
+    
+    console.log('Resolved Team ID:', teamId);
+    console.log('Team ID type:', typeof teamId);
+    
+    // Validate we have proper ID
+    if (!teamId) {
+      Alert.alert('Error', 'Please select a valid team');
+      return;
     }
-  };
+    
+    // Get BDE ID
+    const selectedUser = users.find(user => {
+      const userName = typeof user === 'string' 
+        ? user 
+        : (user.name || user.full_name || user.username);
+      return userName === selectedBDE;
+    });
+    
+    const bdeId = typeof selectedUser === 'string' 
+      ? selectedUser 
+      : (selectedUser?.id || selectedBDE);
+    
+    // Create FormData
+    const formData = new FormData();
+    formData.append('team_id', String(teamId)); // ✅ Now sending the integer ID
+    
+    if (bdeId) {
+      formData.append('bde_id', String(bdeId));
+    }
+    
+    console.log('FormData entries:');
+    for (let [key, value] of formData.entries()) {
+      console.log(`  ${key}: ${value}`);
+    }
+    
+    const response = await fetch(
+      `${API_BASE_URL}/api/clients/${memberId}/allocate`, 
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        body: formData,
+      }
+    );
 
+    const responseText = await response.text();
+    console.log('Response:', responseText);
+    
+    if (!response.ok) {
+      let errorMessage = `HTTP ${response.status}`;
+      try {
+        const errorJson = JSON.parse(responseText);
+        errorMessage = errorJson.error || errorMessage;
+      } catch (e) {
+        // Not JSON
+      }
+      throw new Error(errorMessage);
+    }
+
+    const result = JSON.parse(responseText);
+    
+    // Refresh to get updated data
+    await fetchCustomerProfile();
+    
+    setModalVisible(false);
+    setSelectedTeam('');
+    setSelectedBDE('');
+    
+    Alert.alert('Success', 'Customer allocated successfully');
+    
+  } catch (err) {
+    console.error('Error:', err.message);
+    Alert.alert('Error', `Failed to allocate customer: ${err.message}`);
+  }
+};
   const fetchBusinessTypes = async () => {
   try {
     setLoadingBusinessTypes(true);
@@ -1026,7 +1242,6 @@ const ALLOCATION_TYPE_MAP = {
 
 const handleReceivePayment = async () => {
   try {
-    // Alert at the very start
     Alert.alert('Debug', 'handleReceivePayment started');
     
     console.log('=== HANDLE RECEIVE PAYMENT ===');
@@ -1044,7 +1259,6 @@ const handleReceivePayment = async () => {
       return;
     }
 
-    // Validate allocations
     const validAllocations = allocatedPayments.filter(
       p => p.type && p.amount && parseFloat(p.amount) > 0
     );
@@ -1056,7 +1270,6 @@ const handleReceivePayment = async () => {
       return;
     }
 
-    // Show what we have before mapping
     Alert.alert(
       'Debug - Before Mapping',
       `First allocation:\nType: ${validAllocations[0].type}\nAmount: ${validAllocations[0].amount}`
@@ -1068,12 +1281,10 @@ const handleReceivePayment = async () => {
     setProcessingPayment(true);
     const token = await AsyncStorage.getItem('token');
 
-    // Build allocations array with detailed logging
     const allocations = validAllocations.map((allocation, index) => {
       const typeKey = allocation.type;
       const allocationType = ALLOCATION_TYPE_MAP[typeKey];
       
-      // Alert for each allocation
       if (allocationType === undefined) {
         Alert.alert(
           '⚠️ UNDEFINED TYPE',
@@ -1087,7 +1298,6 @@ const handleReceivePayment = async () => {
       };
     });
 
-    // Show final allocations before API call
     Alert.alert(
       'Debug - Final Allocations',
       JSON.stringify(allocations, null, 2)
@@ -1120,15 +1330,15 @@ const handleReceivePayment = async () => {
       throw new Error(result.error || 'Failed to process payment');
     }
 
-    // Update client state based on payment type
+    // ✅ CHANGED: Update to Dormant instead of Active after membership fee payment
     if (isMembershipFeePayment) {
       setCustomer(prev => ({
         ...prev,
-        status: 'Active',
+        status: 'Dormant',  // ✅ This will map to status 10 in backend
       }));
       Alert.alert(
         'Success', 
-        'Membership fee payment processed successfully. Client is now active.'
+        'Membership fee payment processed successfully. Client is now dormant and can receive loans.'
       );
     } else {
       Alert.alert('Success', 'Payment processed successfully.');
@@ -1140,7 +1350,8 @@ const handleReceivePayment = async () => {
     setTransactionType('');
     setAllocatedPayments([{ type: '', amount: '' }]);
     
-    fetchCustomerProfile();
+    // ✅ Refresh customer profile to get updated status from backend
+    await fetchCustomerProfile();
     
   } catch (err) {
     Alert.alert('Error', `Failed to process payment: ${err.message}`);
@@ -1307,7 +1518,7 @@ const handleSubmitAssessment = async () => {
           <Text style={styles.headerTitle}>Customer Profile</Text>
           
           {/* Show both buttons for Active clients */}
-          {customer.status === 'Active' ? (
+          {customer.status === 'Active' || customer.status === 'Dormant' ? (
             <View style={styles.dualButtonContainer}>
               <TouchableOpacity 
                 style={styles.receivePaymentButtonSmall}
@@ -1327,7 +1538,6 @@ const handleSubmitAssessment = async () => {
               </TouchableOpacity>
             </View>
           ) : (
-            /* Single button for other statuses */
             <TouchableOpacity 
               style={[
                 styles.allocateButton,
@@ -1488,6 +1698,15 @@ const handleSubmitAssessment = async () => {
                       style={{ marginLeft: 8 }}
                     />
                   </TouchableOpacity>
+                </View>
+                <View style={styles.loanRow}>
+                  <Text style={styles.loanLabel}>Amnt Bal for Next Top-up:</Text>
+                  <Text style={[
+                    styles.loanValue,
+                    loanSummary.amntBalForTopup !== 'Ksh 0' && { color: '#FF9800', fontWeight: '600' }
+                  ]}>
+                    {loanSummary.amntBalForTopup}
+                  </Text>
                 </View>
                 
                 <View style={styles.loanRow}>
@@ -1756,6 +1975,7 @@ const handleSubmitAssessment = async () => {
             </View>
 
             <ScrollView style={styles.modalBody}>
+              {/* Team Dropdown */}
               <Text style={styles.dropdownLabel}>Team</Text>
               <TouchableOpacity 
                 style={styles.dropdown}
@@ -1765,26 +1985,40 @@ const handleSubmitAssessment = async () => {
                 }}
               >
                 <Text style={styles.dropdownText}>
-                  {selectedTeam || 'Select Team'}
+                  {selectedTeam 
+                    ? (typeof selectedTeam === 'string' 
+                        ? selectedTeam 
+                        : (selectedTeam.name || selectedTeam.team_name || 'Select Team'))
+                    : 'Select Team'
+                  }
                 </Text>
                 <Ionicons name="chevron-down" size={24} color="#333" />
               </TouchableOpacity>
 
+              {/* Team Dropdown List */}
               {showTeamDropdown && (
                 <View style={styles.dropdownList}>
                   {teams.length > 0 ? (
-                    teams.map((team, index) => (
-                      <TouchableOpacity
-                        key={index}
-                        style={styles.dropdownItem}
-                        onPress={() => {
-                          setSelectedTeam(team);
-                          setShowTeamDropdown(false);
-                        }}
-                      >
-                        <Text style={styles.dropdownItemText}>{team}</Text>
-                      </TouchableOpacity>
-                    ))
+                    teams.map((team, index) => {
+                      // Handle both string and object formats
+                      const teamName = typeof team === 'string' 
+                        ? team 
+                        : (team.name || team.team_name || 'Unknown Team');
+                      const teamId = typeof team === 'string' ? null : team.id;
+                      
+                      return (
+                        <TouchableOpacity
+                          key={teamId || index}
+                          style={styles.dropdownItem}
+                          onPress={() => {
+                            setSelectedTeam(team); 
+                            setShowTeamDropdown(false);
+                          }}
+                        >
+                          <Text style={styles.dropdownItemText}>{teamName}</Text>
+                        </TouchableOpacity>
+                      );
+                    })
                   ) : (
                     <View style={styles.dropdownItem}>
                       <Text style={styles.dropdownItemText}>No teams available</Text>

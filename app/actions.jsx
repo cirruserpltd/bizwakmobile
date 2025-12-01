@@ -50,10 +50,10 @@ const actions = () => {
     },
     actions: [
       { id: 1, label: 'Add a new Customer', icon: 'person-add', color: '#D1F4F7', iconColor: '#00BCD4', borderColor: '#00BCD4', route: '/newlead' },
-      { id: 2, label: 'Allocate lead', icon: 'sync', color: '#D1F4F7', iconColor: '#00BCD4', borderColor: '#00BCD4', count: 0, route: '/client_summary' },
-      { id: 3, label: 'Assess Lead', icon: 'document-text', color: '#FFF9E6', iconColor: '#F57C00', borderColor: '#F57C00', count: 0, route: '/client_summary' },
-      { id: 4, label: 'Approve Lead', icon: 'alert-circle', color: '#FFEBEE', iconColor: '#C62828', borderColor: '#C62828', count: 0, route: '/client_summary' },
-      { id: 5, label: 'onboarding customer', icon: 'send', color: '#E3F2FD', iconColor: '#1976D2', borderColor: '#1976D2', count: 0, route: '/client_summary' },
+      { id: 2, label: 'Allocate Customer', icon: 'sync', color: '#D1F4F7', iconColor: '#00BCD4', borderColor: '#00BCD4', count: 0, route: '/client_summary' },
+      { id: 3, label: 'Assess Customer', icon: 'document-text', color: '#FFF9E6', iconColor: '#F57C00', borderColor: '#F57C00', count: 0, route: '/client_summary' },
+      { id: 4, label: 'Approve Customer', icon: 'alert-circle', color: '#FFEBEE', iconColor: '#C62828', borderColor: '#C62828', count: 0, route: '/client_summary' },
+      { id: 5, label: 'Onboarding Customer', icon: 'send', color: '#E3F2FD', iconColor: '#1976D2', borderColor: '#1976D2', count: 0, route: '/client_summary' },
       { id: 6, label: 'Approve Onboard TL', icon: 'checkmark-circle', color: '#E8F5E9', iconColor: '#388E3C', borderColor: '#4CAF50', count: 0, route: 'ApproveOnboardTL' },
       { id: 7, label: 'Approve Onboard HQ', icon: 'checkmark-circle', color: '#E8F5E9', iconColor: '#388E3C', borderColor: '#4CAF50', count: 0, route: 'ApproveOnboardHQ' },
       { id: 8, label: 'Apply Loan/ Top Up', icon: 'hand-left', color: '#D1F4F7', iconColor: '#00BCD4', borderColor: '#00BCD4', route: 'ApplyLoan' },
@@ -65,18 +65,18 @@ const actions = () => {
   });
 
   const ACTION_STATUS_MAP = {
-    2: { status: 0, label: 'Allocate Lead', type: 'client' },
-    3: { status: 1, label: 'Assess Lead', type: 'client' },
-    4: { status: 2, label: 'Approve Lead', type: 'client' },
-    5: { status: 3, label: 'Onboard Customer', type: 'client' },
-    6: { status: 4, label: 'Approve Onboard TL', type: 'client' },
-    7: { status: 5, label: 'Approve Onboard HQ', type: 'client' },
-    8: { status: 10, label: 'Apply Loan', type: 'client' },
-    9: { status: 10, label: 'Create Loan', type: 'client' },
-    10: { status: 0, label: 'Approve Loan TL', type: 'loan' },
-    11: { status: 2, label: 'Approve Loan HQ', type: 'loan' },
-    12: { status: 3, label: 'Disburse Loan', type: 'loan' },
-  };
+  2: { status: 0, label: 'Pending Allocation', type: 'client' },
+  3: { status: 1, label: 'Pending Assessment', type: 'client' },
+  4: { status: 2, label: 'Pending Approval', type: 'client' },
+  5: { status: 3, label: 'Pending Onboarding', type: 'client' },
+  6: { status: 4, label: 'Pending BM Approval', type: 'client' },
+  7: { status: 5, label: 'Pending HQ Approval', type: 'client' },
+  8: { status: 10, label: 'Dormant', type: 'client' },           // ✅ FIXED (was 6)
+  9: { status: 10, label: 'Dormant', type: 'client' },           // ✅ FIXED (was 6)
+  10: { status: 0, label: 'Pending BM Approval', type: 'loan' },
+  11: { status: 2, label: 'Pending HQ Approval', type: 'loan' },
+  12: { status: 3, label: 'Pending Disbursement', type: 'loan' },
+};
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -164,39 +164,77 @@ const actions = () => {
     return 'All Branches';
   };
 
+  // const fetchClientSummary = async (token) => {
+  //   try {
+  //     let body = {};
+      
+  //     // Add filters based on view type
+  //     if (viewType === 'branch' && selectedView) {
+  //       body.branch_id = selectedView.id;
+  //     } else if (viewType === 'cluster' && selectedView) {
+  //       body.cluster_id = selectedView.id;
+  //     }
+
+  //     const response = await fetch(`${API_BASE_URL}/api/members/getpaginatedclients/1/1`, {
+  //       method: 'POST',
+  //       headers: {
+  //         'Content-Type': 'application/json',
+  //         'Authorization': `Bearer ${token}`,
+  //       },
+  //       credentials: 'include',
+  //       body: JSON.stringify(body),
+  //     });
+
+  //     const result = await response.json();
+      
+  //     if (result.success && result.additional_data && result.additional_data.summary) {
+  //       setClientSummary(result.additional_data.summary);
+  //       return result.additional_data.summary;
+  //     }
+  //     return null;
+  //   } catch (err) {
+  //     console.error('Error fetching client summary:', err);
+  //     return null;
+  //   }
+  // };
   const fetchClientSummary = async (token) => {
-    try {
-      let body = {};
-      
-      // Add filters based on view type
-      if (viewType === 'branch' && selectedView) {
-        body.branch_id = selectedView.id;
-      } else if (viewType === 'cluster' && selectedView) {
-        body.cluster_id = selectedView.id;
-      }
-
-      const response = await fetch(`${API_BASE_URL}/api/members/getpaginatedclients/1/1`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        credentials: 'include',
-        body: JSON.stringify(body),
-      });
-
-      const result = await response.json();
-      
-      if (result.success && result.additional_data && result.additional_data.summary) {
-        setClientSummary(result.additional_data.summary);
-        return result.additional_data.summary;
-      }
-      return null;
-    } catch (err) {
-      console.error('Error fetching client summary:', err);
-      return null;
+  try {
+    let body = {};
+    
+    if (viewType === 'branch' && selectedView) {
+      body.branch_id = selectedView.id;
+    } else if (viewType === 'cluster' && selectedView) {
+      body.cluster_id = selectedView.id;
     }
-  };
+
+    const response = await fetch(`${API_BASE_URL}/api/members/getpaginatedclients/1/1`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      credentials: 'include',
+      body: JSON.stringify(body),
+    });
+
+    const result = await response.json();
+    
+    if (result.success && result.additional_data && result.additional_data.summary) {
+      // ✅ ADD THIS LOGGING
+      console.log('=== CLIENT SUMMARY DEBUG ===');
+      console.log('Full summary:', JSON.stringify(result.additional_data.summary, null, 2));
+      console.log('Pending allocation count:', result.additional_data.summary.total_pending_allocation);
+      console.log('===========================');
+      
+      setClientSummary(result.additional_data.summary);
+      return result.additional_data.summary;
+    }
+    return null;
+  } catch (err) {
+    console.error('Error fetching client summary:', err);
+    return null;
+  }
+};
 
   const fetchLoanSummary = async (token) => {
     try {
@@ -318,60 +356,90 @@ const actions = () => {
   };
 
   const updateActionCounts = (clientSum, loanSum) => {
-    setDashboardData(prev => ({
-      ...prev,
-      actions: prev.actions.map(action => {
-        switch(action.id) {
-          // Client-related actions
-          case 2: // Allocate lead (pending allocation - status 0)
-            return { ...action, count: clientSum?.total_pending_allocation || 0 };
-          case 3: // Assess Lead (pending assessment - status 1)
-            return { ...action, count: clientSum?.total_pending_assessment || 0 };
-          case 4: // Approve Lead (pending approval - status 2)
-            return { ...action, count: clientSum?.total_pending_approval || 0 };
-          case 5: // Onboarding customer (pending onboarding - status 3)
-            return { ...action, count: clientSum?.total_pending_onboarding || 0 };
-          case 6: // Approve Onboard TL (pending BM approval - status 4)
-            return { ...action, count: clientSum?.total_pending_bm_approval || 0 };
-          case 7: // Approve Onboard HQ (pending HQ approval - status 5)
-            return { ...action, count: clientSum?.total_pending_hq_approval || 0 };
-          case 8: // Apply Loan (active clients - status 10)
-            return { ...action, count: clientSum?.total_active || 0 };
-          case 9: // Create Loan (active clients - status 10)
-            return { ...action, count: clientSum?.total_active || 0 };
+  console.log('=== UPDATE ACTION COUNTS ===');
+  console.log('Client Summary:', clientSum);
+  console.log('Loan Summary:', loanSum);
+  
+  setDashboardData(prev => ({
+    ...prev,
+    actions: prev.actions.map(action => {
+      switch(action.id) {
+        case 2: { // Allocate lead (status 0)
+          const totalClients = clientSum?.total_no_of_clients || 0;
+          const accountedClients = 
+            (clientSum?.total_pending_assessment || 0) +
+            (clientSum?.total_pending_approval || 0) +
+            (clientSum?.total_pending_onboarding || 0) +
+            (clientSum?.total_pending_bm_approval || 0) +
+            (clientSum?.total_pending_hq_approval || 0) +
+            (clientSum?.total_pending_appraisal || 0) +           // ✅ Added
+            (clientSum?.total_pending_appraisal_bm_approval || 0) + // ✅ Added
+            (clientSum?.total_pending_appraisal_hq_approval || 0) + // ✅ Added
+            (clientSum?.pending_rf || 0) +
+            (clientSum?.total_dormant || 0) +                     // ✅ This is status 10
+            (clientSum?.total_active || 0) +                      // ✅ This is status 11
+            (clientSum?.total_blacklisted || 0);
           
-          // Loan-related actions
-          case 10: // Approve Loan TL (pending BM approval - status 0)
-            return { 
-              ...action, 
-              count: loanSum?.total_pending_bm_approval || 0,
-              subtitle: loanSum?.total_pending_bm_approval_amount 
-                ? `Ksh ${formatNumber(loanSum.total_pending_bm_approval_amount)}` 
-                : 'Ksh 0'
-            };
-          case 11: // Approve Loan HQ (pending HQ approval - status 2)
-            return { 
-              ...action, 
-              count: loanSum?.total_pending_hq_approval || 0,
-              subtitle: loanSum?.total_pending_hq_approval_amount 
-                ? `Ksh ${formatNumber(loanSum.total_pending_hq_approval_amount)}` 
-                : 'Ksh 0'
-            };
-          case 12: // Disburse Loan (pending disbursement - status 3)
-            return { 
-              ...action, 
-              count: loanSum?.total_pending_disbursement || 0,
-              subtitle: loanSum?.total_pending_disbursement_amount 
-                ? `Ksh ${formatNumber(loanSum.total_pending_disbursement_amount)}` 
-                : 'Ksh 0'
-            };
-          
-          default:
-            return action;
+          const allocateCount = Math.max(0, totalClients - accountedClients);
+          console.log('Allocate Customer:', {
+            total: totalClients,
+            accounted: accountedClients,
+            pending_allocation: allocateCount
+          });
+          return { ...action, count: allocateCount };
         }
-      })
-    }));
-  };
+          
+        case 3: // Assess Lead (status 1)
+          return { ...action, count: clientSum?.total_pending_assessment || 0 };
+          
+        case 4: // Approve Lead (status 2)
+          return { ...action, count: clientSum?.total_pending_approval || 0 };
+          
+        case 5: // Onboarding (status 3)
+          return { ...action, count: clientSum?.total_pending_onboarding || 0 };
+          
+        case 6: // BM Approval (status 4)
+          return { ...action, count: clientSum?.total_pending_bm_approval || 0 };
+          
+        case 7: // HQ Approval (status 5)
+          return { ...action, count: clientSum?.total_pending_hq_approval || 0 };
+          
+        case 8: // Apply Loan - Dormant (status 10) + Active (status 11)
+          const applyLoanCount = (clientSum?.total_dormant || 0) + (clientSum?.total_active || 0);
+          return { ...action, count: applyLoanCount };
+          
+        case 9: // Create Loan - Dormant (status 10) + Active (status 11)
+          const createLoanCount = (clientSum?.total_dormant || 0) + (clientSum?.total_active || 0);
+          return { ...action, count: createLoanCount };
+        
+        // Loan-related actions
+        case 10: // Approve Loan TL
+          return { 
+            ...action, 
+            count: loanSum?.total_pending_bm_approval || 0,
+            subtitle: `Ksh ${formatNumber(loanSum?.total_pending_bm_approval_amount || 0)}`
+          };
+          
+        case 11: // Approve Loan HQ
+          return { 
+            ...action, 
+            count: loanSum?.total_pending_hq_approval || 0,
+            subtitle: `Ksh ${formatNumber(loanSum?.total_pending_hq_approval_amount || 0)}`
+          };
+          
+        case 12: // Disburse Loan
+          return { 
+            ...action, 
+            count: loanSum?.total_pending_disbursement || 0,
+            subtitle: `Ksh ${formatNumber(loanSum?.total_pending_disbursement_amount || 0)}`
+          };
+        
+        default:
+          return action;
+      }
+    })
+  }));
+};
 
   const calculateTotal = (groupedData) => {
     if (!groupedData) return 0;
