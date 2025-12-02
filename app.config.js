@@ -4,6 +4,7 @@ export default {
   expo: {
     name: "Bizwak",
     slug: "bizwak",
+    owner: "cirrus-erp-ltd",
     version: "1.0.0",
     orientation: "portrait",
     icon: "./assets/icon.png",
@@ -28,7 +29,7 @@ export default {
     extra: {
       API_BASE_URL: process.env.API_BASE_URL,
       eas: {
-        projectId: "73835495-292c-4656-b7a5-8292fc5e24bb",
+        projectId: "900f41f8-d69b-45c2-bae5-802b679d2893"
       },
     },
     updates: {
