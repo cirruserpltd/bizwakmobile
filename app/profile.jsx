@@ -116,6 +116,7 @@ const [requiredPaymentForTopup, setRequiredPaymentForTopup] = useState(0);
 const [availableCredit, setAvailableCredit] = useState(0);
 const [activeLoansCount, setActiveLoansCount] = useState(0);
 
+
   
 
   const addAllocation = () => {
@@ -919,9 +920,38 @@ const calculateLoanSummary = () => {
   fetchBusinessTypes();
   setAssessModalVisible(true);
 };
-//   const openApproveModal = () => {
-//   // Use the already fetched customer data
+// const openApproveModal = () => {
 //   if (customer && customer.rawData) {
+    
+//     let businessTypes = customer.rawData.business_types || [];
+    
+    
+//     if (customer.rawData.business_types_data) {
+//       if (typeof customer.rawData.business_types_data === 'string') {
+//         try {
+//           businessTypes = JSON.parse(customer.rawData.business_types_data);
+//         } catch (e) {
+//           console.error('Failed to parse business_types_data:', e);
+//           businessTypes = [];
+//         }
+//       } else if (Array.isArray(customer.rawData.business_types_data)) {
+//         businessTypes = customer.rawData.business_types_data;
+//       }
+//     }
+//     // Fallback to business_types if business_types_data doesn't exist
+//     else if (customer.rawData.business_types) {
+//       if (typeof customer.rawData.business_types === 'string') {
+//         try {
+//           businessTypes = JSON.parse(customer.rawData.business_types);
+//         } catch (e) {
+//           console.error('Failed to parse business_types:', e);
+//           businessTypes = [];
+//         }
+//       } else if (Array.isArray(customer.rawData.business_types)) {
+//         businessTypes = customer.rawData.business_types;
+//       }
+//     }
+
 //     const assessmentData = {
 //       surname: customer.name?.split(' ')[0] || '',
 //       other_names: customer.name?.split(' ').slice(1).join(' ') || '',
@@ -937,11 +967,16 @@ const calculateLoanSummary = () => {
 //       owns_business: customer.rawData.owns_business || '',
 //       business_legitimacy: customer.rawData.business_legitimacy || '',
 //       loan_purpose: customer.rawData.loan_purpose || '',
-//       business_types: customer.rawData.business_types || [],
+//       business_types: businessTypes,
+//       category: customer.rawData.category || '', 
 //       assessed_by: customer.rawData.assessed_by || '',
 //       assessed_on: customer.rawData.assessed_date || customer.rawData.assessment_date || '',
 //       assessed_at: customer.rawData.assessed_time || customer.rawData.assessment_time || '',
 //     };
+    
+//     console.log('Assessment Details:', assessmentData);
+//     console.log('Business Types:', businessTypes);
+//     console.log('Category:', assessmentData.category);
     
 //     setAssessmentDetails(assessmentData);
 //     setApproveModalVisible(true);
@@ -949,71 +984,116 @@ const calculateLoanSummary = () => {
 //     Alert.alert('Error', 'Customer data not available');
 //   }
 // };
-const openApproveModal = () => {
-  if (customer && customer.rawData) {
+ const openApproveModal = async () => {
+  try {
+    // Show loading state
+    setLoadingApproval(true);
     
-    let businessTypes = customer.rawData.business_types || [];
+    // Fetch fresh data from API
+    const token = await AsyncStorage.getItem('token');
+    if (!token) {
+      throw new Error('No token found');
+    }
+
+    const response = await fetch(
+      `${API_BASE_URL}/api/clients/${memberId}`,
+      {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
     
+    if (!data.client) {
+      throw new Error('Client not found');
+    }
+
+    const client = data.client;
     
-    if (customer.rawData.business_types_data) {
-      if (typeof customer.rawData.business_types_data === 'string') {
+    // Extract business types - handle both string and array formats
+    let businessTypes = [];
+    
+    if (client.business_types_data) {
+      if (typeof client.business_types_data === 'string') {
         try {
-          businessTypes = JSON.parse(customer.rawData.business_types_data);
+          businessTypes = JSON.parse(client.business_types_data);
         } catch (e) {
           console.error('Failed to parse business_types_data:', e);
           businessTypes = [];
         }
-      } else if (Array.isArray(customer.rawData.business_types_data)) {
-        businessTypes = customer.rawData.business_types_data;
-      }
-    }
-    // Fallback to business_types if business_types_data doesn't exist
-    else if (customer.rawData.business_types) {
-      if (typeof customer.rawData.business_types === 'string') {
-        try {
-          businessTypes = JSON.parse(customer.rawData.business_types);
-        } catch (e) {
-          console.error('Failed to parse business_types:', e);
-          businessTypes = [];
-        }
-      } else if (Array.isArray(customer.rawData.business_types)) {
-        businessTypes = customer.rawData.business_types;
+      } else if (Array.isArray(client.business_types_data)) {
+        businessTypes = client.business_types_data;
       }
     }
 
+    // Extract assessment details (who did it and when)
+    let assessedBy = '';
+    let assessedOn = '';
+    let assessedAt = '';
+    
+    if (client.lead_assessment_details && Array.isArray(client.lead_assessment_details)) {
+      const latestAssessment = client.lead_assessment_details[client.lead_assessment_details.length - 1];
+      if (latestAssessment) {
+        assessedBy = latestAssessment.assessed_by || latestAssessment.user || '';
+        assessedOn = latestAssessment.date || latestAssessment.assessed_on || '';
+        assessedAt = latestAssessment.time || latestAssessment.assessed_at || '';
+      }
+    }
+
+    // Build assessment data object with all fields from API
     const assessmentData = {
-      surname: customer.name?.split(' ')[0] || '',
-      other_names: customer.name?.split(' ').slice(1).join(' ') || '',
-      phone: customer.phone || '',
-      team: customer.team || '',
-      marketing_type: customer.rawData.marketing_type || '',
-      business_nature: customer.rawData.business_nature || '',
-      business_premise_type: customer.rawData.business_premise_type || '',
-      stock_type: customer.rawData.stock_type || '',
-      stock_level: customer.rawData.stock_level || '',
-      interest_level: customer.rawData.interest_level || '',
-      personal_character: customer.rawData.personal_character || '',
-      owns_business: customer.rawData.owns_business || '',
-      business_legitimacy: customer.rawData.business_legitimacy || '',
-      loan_purpose: customer.rawData.loan_purpose || '',
+      surname: client.name?.split(' ')[0] || '',
+      other_names: client.name?.split(' ').slice(1).join(' ') || '',
+      phone: client.phone || '',
+      team: data.teams?.[0]?.name || '',
+      
+      // ✅ All assessment fields from API
+      marketing_type: client.marketing_type || '',
+      business_nature: client.business_nature || '',
+      business_premise_type: client.business_premise_type || '',  // ✅ NOW FROM API
+      stock_type: client.stock_type || '',
+      stock_level: client.stock_level || '',
+      interest_level: client.interest_level || '',  // ✅ NOW FROM API
+      personal_character: client.personal_character || '',  // ✅ NOW FROM API
+      owns_business: client.owns_business || '',
+      business_legitimacy: client.business_legitimacy || '',
+      loan_purpose: client.loan_purpose || '',  // ✅ NOW FROM API
+      
+      // Business types with proper IDs
       business_types: businessTypes,
-      category: customer.rawData.category || '', 
-      assessed_by: customer.rawData.assessed_by || '',
-      assessed_on: customer.rawData.assessed_date || customer.rawData.assessment_date || '',
-      assessed_at: customer.rawData.assessed_time || customer.rawData.assessment_time || '',
+      
+      // Category - extract from first business type if available
+      category: businessTypes.length > 0 && businessTypes[0].category 
+        ? businessTypes[0].category 
+        : '',
+      
+      // Assessment audit info
+      assessed_by: assessedBy,
+      assessed_on: assessedOn,
+      assessed_at: assessedAt,
     };
     
-    console.log('Assessment Details:', assessmentData);
-    console.log('Business Types:', businessTypes);
-    console.log('Category:', assessmentData.category);
+    console.log('✅ Assessment Details from API:', assessmentData);
+    console.log('✅ Business Types with IDs:', businessTypes);
     
     setAssessmentDetails(assessmentData);
     setApproveModalVisible(true);
-  } else {
-    Alert.alert('Error', 'Customer data not available');
+    
+  } catch (err) {
+    console.error('Error fetching assessment details:', err);
+    Alert.alert('Error', `Failed to load assessment details: ${err.message}`);
+  } finally {
+    setLoadingApproval(false);
   }
 };
-
 const handleBusinessTypeSearch = (text, index) => {
   updateBusinessType(index, text);
   
@@ -1067,7 +1147,7 @@ const handleApproveAssessment = async () => {
     
     setCustomer({
       ...customer,
-      status: 'Pending Onboarding', // Update to next status
+      status: 'Pending Onboarding', 
     });
     
     setApproveModalVisible(false);

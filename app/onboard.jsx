@@ -80,7 +80,30 @@ export default function ClientFormScreen() {
     relationship: ''
   }]);
 
-  const [dependants, setDependants] = useState([]);
+  const [dependants, setDependants] = useState([{
+    id: 1,
+    name: '',
+    age: ''
+  }]);
+  const addDependant = () => {
+  setDependants([...dependants, {
+    id: dependants.length + 1,
+    name: '',
+    age: ''
+  }]);
+};
+
+const updateDependant = (id, field, value) => {
+  setDependants(dependants.map(dep => 
+    dep.id === id ? { ...dep, [field]: value } : dep
+  ));
+};
+
+const removeDependant = (id) => {
+  if (dependants.length > 1) {
+    setDependants(dependants.filter(dep => dep.id !== id));
+  }
+};
   const [perishableStock, setPerishableStock] = useState([{
     id: 1,
     product_name: '',
@@ -1113,11 +1136,11 @@ export default function ClientFormScreen() {
       <Text style={styles.label}>Marital Status</Text>
       <View style={styles.radioGroup}>
         {['Single', 'Married', 'Divorced', 'Widowed'].map((status) => (
-          <TouchableOpacity
-            key={status}
-            style={styles.radioOption}
-            onPress={() => setFormData({ ...formData, marital_status: status })}
-          >
+        <TouchableOpacity
+          key={status}
+          style={styles.radioOption}
+          onPress={() => setFormData({ ...formData, marital_status: status })}
+        >
             <View
               style={[
                 styles.radio,
@@ -1192,7 +1215,54 @@ export default function ClientFormScreen() {
         </View>
       ))}
 
-      <Text style={styles.sectionTitle}>Dependants</Text>
+      <View style={styles.dependantsSection}>
+        <Text style={styles.dependantsTitle}>Dependants</Text>
+        <TouchableOpacity style={styles.addButton} onPress={addDependant}>
+          <Ionicons name="add-circle" size={24} color="#007AFF" />
+        </TouchableOpacity>
+      </View>
+
+      {dependants.map((dependant, index) => (
+        <View key={dependant.id} style={styles.kinSection}>
+          <View style={styles.dependantHeader}>
+            <Text style={styles.nextOfKinLabel}>Dependant {index + 1}</Text>
+            {dependants.length > 1 && (
+              <TouchableOpacity onPress={() => removeDependant(dependant.id)}>
+                <Ionicons name="close-circle" size={24} color="#FF3B30" />
+              </TouchableOpacity>
+            )}
+          </View>
+          
+          <View style={styles.row}>
+            <View style={styles.halfInput}>
+              <Text style={styles.label}>Name</Text>
+              <TextInput
+                style={styles.input}
+                value={dependant.name}
+                onChangeText={(text) => updateDependant(dependant.id, 'name', text)}
+                placeholder="Enter name"
+              />
+            </View>
+            <View style={styles.halfInput}>
+              <Text style={styles.label}>Age</Text>
+              <TextInput
+                style={styles.input}
+                value={dependant.age}
+                onChangeText={(text) => updateDependant(dependant.id, 'age', text)}
+                placeholder="Enter age"
+                keyboardType="numeric"
+              />
+            </View>
+          </View>
+
+          <TouchableOpacity style={styles.saveButton}>
+            <Text style={styles.saveButtonText}>Save</Text>
+            <Ionicons name="checkmark" size={20} color="#fff" />
+          </TouchableOpacity>
+        </View>
+      ))}
+
+      <Text style={styles.sectionTitle}>Documents</Text>
       <Text style={styles.uploadSubtitle}>Upload Files And Attachments</Text>
       
       {renderImageUploadBox('profile_image', 'Profile')}
@@ -2985,6 +3055,12 @@ const styles = StyleSheet.create({
     color: '#ccc',
     fontSize: 12,
     marginTop: 2,
+  },
+  dependantHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
   },
 
 });
