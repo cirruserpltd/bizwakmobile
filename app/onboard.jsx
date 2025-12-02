@@ -967,7 +967,11 @@ const removeDependant = (id) => {
   };
 
   const renderStep1 = () => (
-    <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+    <ScrollView 
+      style={styles.scrollView} 
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={styles.scrollViewContent}
+    >
       {renderNumberButtons()}
       <Text style={styles.sectionTitle}>Member personal information</Text>
 
@@ -1153,6 +1157,14 @@ const removeDependant = (id) => {
       </View>
     </View>
 
+     <Text style={styles.sectionTitle}>Documents</Text>
+      <Text style={styles.uploadSubtitle}>Upload Files And Attachments</Text>
+      
+      {renderImageUploadBox('profile_image', 'Profile')}
+      {renderImageUploadBox('id_front', 'ID Front')}
+      {renderImageUploadBox('id_back', 'ID Back')}
+      {renderImageUploadBox('client_signature', 'Client Signature')}
+      {renderImageUploadBox('additional_docs', 'Additional Documents (Optional)')}
 
       <TouchableOpacity style={styles.saveButton}>
         <Text style={styles.saveButtonText}>Save</Text>
@@ -1255,22 +1267,14 @@ const removeDependant = (id) => {
             </View>
           </View>
 
-          <TouchableOpacity style={styles.saveButton}>
+          {/* <TouchableOpacity style={styles.saveButton}>
             <Text style={styles.saveButtonText}>Save</Text>
             <Ionicons name="checkmark" size={20} color="#fff" />
-          </TouchableOpacity>
+          </TouchableOpacity> */}
         </View>
       ))}
 
-      <Text style={styles.sectionTitle}>Documents</Text>
-      <Text style={styles.uploadSubtitle}>Upload Files And Attachments</Text>
-      
-      {renderImageUploadBox('profile_image', 'Profile')}
-      {renderImageUploadBox('id_front', 'ID Front')}
-      {renderImageUploadBox('id_back', 'ID Back')}
-      {renderImageUploadBox('client_signature', 'Client Signature')}
-      {renderImageUploadBox('additional_docs', 'Additional Documents (Optional)')}
-
+     
       <TouchableOpacity 
         style={styles.submitButton} 
         onPress={handleSubmit}
@@ -1286,7 +1290,11 @@ const removeDependant = (id) => {
   );
 
   const renderStep2 = () => (
-    <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+   <ScrollView 
+      style={styles.scrollView} 
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={styles.scrollViewContent}
+  >
       {renderNumberButtons()}
 
       <View style={styles.sectionHeader}>
@@ -1771,7 +1779,11 @@ const removeDependant = (id) => {
   );
 
   const renderStep3 = () => (
-    <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+    <ScrollView 
+      style={styles.scrollView} 
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={styles.scrollViewContent}
+    >
       {renderNumberButtons()}
 
       <Text style={styles.sectionTitle}>Home Visit</Text>
@@ -2076,7 +2088,11 @@ const removeDependant = (id) => {
   );
 
   const renderStep4 = () => (
-    <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+    <ScrollView 
+      style={styles.scrollView} 
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={styles.scrollViewContent}
+    >
       {renderNumberButtons()}
 
       <Text style={styles.sectionTitleBlue}>Agreements</Text>
@@ -2286,7 +2302,11 @@ const removeDependant = (id) => {
   );
 
   const renderStep5 = () => (
-    <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+    <ScrollView 
+      style={styles.scrollView} 
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={styles.scrollViewContent}
+    >
       {renderNumberButtons()}
       
       <Text style={styles.sectionTitleBlue}>Affordability</Text>
@@ -2491,6 +2511,9 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
     padding: 16,
+  },
+  scrollViewContent: {
+    paddingBottom: 100, 
   },
   numberButtons: {
     flexDirection: 'row',

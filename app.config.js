@@ -17,7 +17,7 @@ export default {
       package: "com.bizwak.app",
       versionCode: 1,
       adaptiveIcon: {
-        foregroundImage: "./assets/icon.png",
+        foregroundImage: "./assets/adaptive-icon.png",
         backgroundColor: "#ffffff"
       },
       permissions: [

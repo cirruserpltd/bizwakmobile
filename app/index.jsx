@@ -85,7 +85,7 @@ export default function LoginScreen() {
         <View style={styles.content}>
           {/* User Icon */}
           <Image 
-            source={require('../assets/img1.png')}  
+            source={require('../assets/icon.png')}  
             style={styles.logoImage}
           />
 

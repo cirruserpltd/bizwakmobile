@@ -53,11 +53,11 @@ const actions = () => {
       { id: 2, label: 'Allocate Customer', icon: 'sync', color: '#D1F4F7', iconColor: '#00BCD4', borderColor: '#00BCD4', count: 0, route: '/client_summary' },
       { id: 3, label: 'Assess Customer', icon: 'document-text', color: '#FFF9E6', iconColor: '#F57C00', borderColor: '#F57C00', count: 0, route: '/client_summary' },
       { id: 4, label: 'Approve Customer', icon: 'alert-circle', color: '#FFEBEE', iconColor: '#C62828', borderColor: '#C62828', count: 0, route: '/client_summary' },
-      { id: 5, label: 'Onboarding Customer', icon: 'send', color: '#E3F2FD', iconColor: '#1976D2', borderColor: '#1976D2', count: 0, route: '/client_summary' },
+      { id: 5, label: 'Onboard Customer', icon: 'send', color: '#E3F2FD', iconColor: '#1976D2', borderColor: '#1976D2', count: 0, route: '/client_summary' },
       { id: 6, label: 'Approve Onboard TL', icon: 'checkmark-circle', color: '#E8F5E9', iconColor: '#388E3C', borderColor: '#4CAF50', count: 0, route: 'ApproveOnboardTL' },
       { id: 7, label: 'Approve Onboard HQ', icon: 'checkmark-circle', color: '#E8F5E9', iconColor: '#388E3C', borderColor: '#4CAF50', count: 0, route: 'ApproveOnboardHQ' },
-      { id: 13, label: 'Pending RF', icon: 'document-attach', color: '#FFF9E6', iconColor: '#F57C00', borderColor: '#F57C00', count: 0, route: '/client_summary' },
-      { id: 8, label: 'Apply Loan/ Top Up', icon: 'hand-left', color: '#D1F4F7', iconColor: '#00BCD4', borderColor: '#00BCD4', route: 'ApplyLoan' },
+      { id: 13, label: 'Pay RF', icon: 'document-attach', color: '#FFF9E6', iconColor: '#F57C00', borderColor: '#F57C00', count: 0, route: '/client_summary' },
+      //{ id: 8, label: 'Apply Loan/ Top Up', icon: 'hand-left', color: '#D1F4F7', iconColor: '#00BCD4', borderColor: '#00BCD4', route: 'ApplyLoan' },
       { id: 9, label: 'Create Loan/Top Up', icon: 'hand-left', color: '#D1F4F7', iconColor: '#00BCD4', borderColor: '#2196F3', route: '/create_loan' },
       { id: 10, label: 'Approve Loan TL', icon: 'document-text', color: '#FFF9E6', iconColor: '#F57C00', borderColor: '#F57C00', subtitle: 'Ksh 0', count: 0, route: '/loan_summary' },
       { id: 11, label: 'Approve Loan HQ', icon: 'document-text', color: '#FFF9E6', iconColor: '#F57C00', borderColor: '#F57C00', subtitle: 'Ksh 0', count: 0, route: '/loan_summary' },
@@ -65,16 +65,30 @@ const actions = () => {
     ],
   });
 
+  // const ACTION_STATUS_MAP = {
+  //   2: { status: 0, label: 'Pending Allocation', type: 'client' },
+  //   3: { status: 1, label: 'Pending Assessment', type: 'client' },
+  //   4: { status: 2, label: 'Pending Approval', type: 'client' },
+  //   5: { status: 3, label: 'Pending Onboarding', type: 'client' },
+  //   6: { status: 4, label: 'Pending BM Approval', type: 'client' },
+  //   7: { status: 5, label: 'Pending HQ Approval', type: 'client' },
+  //   13: { status: 'pending_rf', label: 'Pending RF', type: 'client' },
+  //   8: { status: 10, label: 'Dormant', type: 'client' },           
+  //   9: { status: 10, label: 'Dormant', type: 'client' },          
+  //   10: { status: 0, label: 'Pending BM Approval', type: 'loan' },
+  //   11: { status: 2, label: 'Pending HQ Approval', type: 'loan' },
+  //   12: { status: 3, label: 'Pending Disbursement', type: 'loan' },
+  // };
   const ACTION_STATUS_MAP = {
-    2: { status: 0, label: 'Pending Allocation', type: 'client' },
+    2: { status: 0, label: 'Pending Allocation', type: 'client' },  // Verify this status value
     3: { status: 1, label: 'Pending Assessment', type: 'client' },
     4: { status: 2, label: 'Pending Approval', type: 'client' },
     5: { status: 3, label: 'Pending Onboarding', type: 'client' },
     6: { status: 4, label: 'Pending BM Approval', type: 'client' },
     7: { status: 5, label: 'Pending HQ Approval', type: 'client' },
     13: { status: 'pending_rf', label: 'Pending RF', type: 'client' },
-    8: { status: 10, label: 'Dormant', type: 'client' },           
-    9: { status: 10, label: 'Dormant', type: 'client' },          
+    // ID 8 removed - not in your actions array
+    9: { status: 10, label: 'Dormant', type: 'client' },  // Changed to use status filter
     10: { status: 0, label: 'Pending BM Approval', type: 'loan' },
     11: { status: 2, label: 'Pending HQ Approval', type: 'loan' },
     12: { status: 3, label: 'Pending Disbursement', type: 'loan' },
@@ -480,12 +494,20 @@ const actions = () => {
   };
 
   const handleActionPress = (action) => {
+     if (action.id === 1) {
+        router.push('/newlead');
+        return;
+      }
     const actionConfig = ACTION_STATUS_MAP[action.id];
     
-    if (!actionConfig) {
-      router.push(action.route);
-      return;
-    }
+     if (!actionConfig) {
+        console.warn(`No action config found for action ID: ${action.id}`);
+        
+        if (action.route) {
+          router.push(action.route);
+        }
+        return;
+      }
 
     if (actionConfig.type === 'client') {
       router.push({
