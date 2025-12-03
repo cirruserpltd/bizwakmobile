@@ -124,6 +124,7 @@ export default function LoansReportScreen() {
       });
 
       const result = await response.json();
+      console.log('API Response Sample:', result.payload[0]);
 
       if (result.success) {
         const loans = result.payload || [];
@@ -134,8 +135,8 @@ export default function LoansReportScreen() {
           memberId: loan.client_id,
           name: loan.name || 'N/A',
           phone: loan.phone || 'N/A',
-          paid: Number(loan.amount_paid || loan.paid || 0),
-          balance: Number(loan.outstanding_balance || loan.balance || 0),
+          paid: Number(loan.il_amount_paid || 0),
+          balance: Number(loan.il_balance_due || 0),
           status: loan.status,
           statusLabel: getStatusLabel(loan.status),
           statusStyles: getStatusStyles(loan.status),

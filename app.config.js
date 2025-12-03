@@ -5,7 +5,7 @@ export default {
     name: "Bizwak",
     slug: "bizwak",
     owner: "cirrus-erp-ltd",
-    version: "1.0.0",
+    version: "1.0.1",
     orientation: "portrait",
     icon: "./assets/icon.png",
     userInterfaceStyle: "light",
@@ -16,12 +16,13 @@ export default {
     },
     android: {
       package: "com.bizwak.app",
-      versionCode: 1,
+      versionCode: 2,
       adaptiveIcon: {
         foregroundImage: "./assets/adaptive-icon.png",
         backgroundColor: "#ffffff"
       },
       permissions: [
+        "READ_MEDIA_IMAGES",
         "INTERNET",
         "ACCESS_NETWORK_STATE"
       ]
