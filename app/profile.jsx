@@ -175,7 +175,7 @@ const [activeLoansCount, setActiveLoansCount] = useState(0);
 };
 
   // Function to handle status button actions
-  const handleStatusAction = () => {
+  const handleStatusAction =  async () => {
   if (customer.status === 'Pending Allocation') {
     openAllocateModal();
   } else if (customer.status === 'Pending Assessment') {
@@ -185,8 +185,10 @@ const [activeLoansCount, setActiveLoansCount] = useState(0);
   } else if (customer.status === 'Pending Onboarding') {
     handleOnboard();
   } else if (customer.status === 'Pending BM Approval') {
+    await fetchCurrentUserForApproval(); 
     setBmApprovalModalVisible(true);
   } else if (customer.status === 'Pending HQ Approval') {
+    await fetchCurrentUserForApproval(); 
     setHqApprovalModalVisible(true);
   } else if (customer.status === 'Pending RF') {
     setIsMembershipFeePayment(true);
@@ -205,6 +207,7 @@ const [activeLoansCount, setActiveLoansCount] = useState(0);
       //fetchLoans();
       fetchLoanSummaryData();
       fetchDisbursements();
+      fetchAllUsers();
     } else {
       setError('No member ID provided');
       setLoading(false);
@@ -392,6 +395,82 @@ const [activeLoansCount, setActiveLoansCount] = useState(0);
       setLoading(false);
     }
   };
+
+  const fetchAllUsers = async () => {
+  try {
+    const token = await AsyncStorage.getItem('token');
+    if (!token) {
+      throw new Error('No token found');
+    }
+
+    const response = await fetch(
+      `${API_BASE_URL}/api/users`,
+      {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log('Fetched all users:', data);
+    
+    if (data.status === 'success' && data.payload) {
+      setUsers(data.payload);
+    } else {
+      setUsers([]);
+    }
+    
+  } catch (err) {
+    console.error('Error fetching all users:', err);
+    Alert.alert('Error', `Failed to load users: ${err.message}`);
+  }
+};
+
+  const fetchCurrentUserForApproval = async () => {
+  try {
+    const token = await AsyncStorage.getItem('token');
+    if (!token) {
+      throw new Error('No token found');
+    }
+
+    const response = await fetch(
+      `${API_BASE_URL}/api/users/currentUser`,
+      {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log('Current user for approval:', data);
+    
+    if (data.status === 'success' && data.payload && data.payload.length > 0) {
+      const currentApprover = data.payload[0];
+      
+      setSelectedApprover(currentApprover.id);
+      
+      setCurrentUser(currentApprover);
+    }
+    
+  } catch (err) {
+    console.error('Error fetching current user for approval:', err);
+    Alert.alert('Error', `Failed to load user information: ${err.message}`);
+  }
+};
 
 //   const fetchLoans = async () => {
 //   try {
@@ -625,114 +704,7 @@ const fetchLoanSummaryData = async () => {
   }
 };
 
-//  const calculateLoanSummary = () => {
-//   if (!loans || loans.length === 0) {
-//     return {
-//       noOfLoans: 0,
-//       loanLimit: 'Ksh 0 per product',
-//       loanPrincipal: 'Ksh 0',
-//       dateDisbursed: '-',
-//       loanDueDate: '-',
-//       repayableAmount: 'Ksh 0',
-//       totalPaid: 'Ksh 0',
-//       totalBalance: 'Ksh 0',
-//       balanceDueToday: 'Ksh 0',
-//       availableTopUp: 'Ksh 0',
-//     };
-//   }
 
-//   const totalPrincipal = loans.reduce((sum, loan) => sum + (loan.amount || 0), 0);
-//   const totalBalance = loans.reduce((sum, loan) => sum + (loan.il_balance_due || loan.outstanding_balance || 0), 0);
-//   const totalPaid = loans.reduce((sum, loan) => sum + (loan.total_amount_paid || 0), 0);
-//   const totalRepayable = loans.reduce((sum, loan) => sum + (loan.repayable_amount || 0), 0);
-
-//   const disbursedLoans = loans.filter(loan => loan.disbursed_at);
-//   const latestDisbursement = disbursedLoans.length > 0
-//     ? new Date(Math.max(...disbursedLoans.map(loan => new Date(loan.disbursed_at))))
-//     : null;
-
-//   const loansWithDueDate = loans.filter(loan => loan.next_due_date);
-//   const nearestDueDate = loansWithDueDate.length > 0
-//     ? new Date(Math.min(...loansWithDueDate.map(loan => new Date(loan.next_due_date))))
-//     : null;
-
-//   const balanceDueToday = loans.reduce((sum, loan) => sum + (loan.amount_due_today || 0), 0);
-
-//   return {
-//     noOfLoans: loans.length,
-//     loanLimit: customer?.loans?.loanLimit || 'Ksh 0 per product',
-//     loanPrincipal: `Ksh ${totalPrincipal.toLocaleString()}`,
-//     dateDisbursed: latestDisbursement ? latestDisbursement.toLocaleDateString() : '-',
-//     loanDueDate: nearestDueDate ? nearestDueDate.toLocaleDateString() : '-',
-//     repayableAmount: `Ksh ${totalRepayable.toLocaleString()}`,
-//     totalPaid: `Ksh ${totalPaid.toLocaleString()}`,
-//     totalBalance: `Ksh ${totalBalance.toLocaleString()}`,
-//     balanceDueToday: ` ${Math.round(balanceDueToday).toLocaleString()}`,
-//     availableTopUp: customer?.loans?.availableTopUp || 'Ksh 0',
-//   };
-// };
-
-
-
-  // const handleAllocate = async () => {
-  //   try {
-  //     const token = await AsyncStorage.getItem('token');
-
-  //   console.log('=== ALLOCATION REQUEST ===');
-  //   console.log('Selected Team:', selectedTeam);
-  //   console.log('Selected BDE:', selectedBDE);
-    
-  //   // Use FormData to match your backend expectation
-  //   const formData = new FormData();
-  //   formData.append('team_id', selectedTeam);
-    
-  //   // ONLY append bde_id if it's actually selected
-  //   if (selectedBDE && selectedBDE.trim() !== '') {
-  //     formData.append('bde_id', selectedBDE);
-  //     console.log('Adding bde_id to request:', selectedBDE);
-  //   } else {
-  //     console.log('No BDE selected, not sending bde_id');
-  //   }
-      
-  //     const response = await fetch(
-  //       `${API_BASE_URL}/api/clients/${memberId}/allocate`, 
-  //       {
-  //         method: 'POST',
-  //         headers: {
-  //           'Content-Type': 'application/json',
-  //           'Authorization': `Bearer ${token}`,
-  //         },
-  //         body: JSON.stringify({
-  //           team_id: selectedTeam,
-  //           bde_id: selectedBDE,
-  //         }),
-  //       }
-  //     );
-
-  //     if (!response.ok) {
-  //       throw new Error('Failed to allocate customer');
-  //     }
-
-  //     const result = await response.json();
-
-  //     // Update local state
-  //     setCustomer({
-  //       ...customer,
-  //       status: 'Pending Assessment',
-  //       team: selectedTeam,
-  //     });
-      
-  //     setModalVisible(false);
-  //     setSelectedTeam('');
-  //     setSelectedBDE('');
-      
-  //     Alert.alert('Success', 'Customer allocated successfully');
-      
-  //   } catch (err) {
-  //     Alert.alert('Error', `Failed to allocate customer: ${err.message}`);
-  //     console.error('Error allocating customer:', err);
-  //   }
-  // };
 const calculateLoanSummary = () => {
   if (!loans || loans.length === 0) {
     return {
@@ -811,7 +783,7 @@ const calculateLoanSummary = () => {
     
     // Create FormData
     const formData = new FormData();
-    formData.append('team_id', String(teamId)); // ✅ Now sending the integer ID
+    formData.append('team_id', String(teamId)); 
     
     if (bdeId) {
       formData.append('bde_id', String(bdeId));
@@ -906,6 +878,7 @@ const calculateLoanSummary = () => {
 
 
   const openAllocateModal = () => {
+    fetchAllUsers();
     setModalVisible(true);
   };
   const openAssessModal = () => {
@@ -920,70 +893,7 @@ const calculateLoanSummary = () => {
   fetchBusinessTypes();
   setAssessModalVisible(true);
 };
-// const openApproveModal = () => {
-//   if (customer && customer.rawData) {
-    
-//     let businessTypes = customer.rawData.business_types || [];
-    
-    
-//     if (customer.rawData.business_types_data) {
-//       if (typeof customer.rawData.business_types_data === 'string') {
-//         try {
-//           businessTypes = JSON.parse(customer.rawData.business_types_data);
-//         } catch (e) {
-//           console.error('Failed to parse business_types_data:', e);
-//           businessTypes = [];
-//         }
-//       } else if (Array.isArray(customer.rawData.business_types_data)) {
-//         businessTypes = customer.rawData.business_types_data;
-//       }
-//     }
-//     // Fallback to business_types if business_types_data doesn't exist
-//     else if (customer.rawData.business_types) {
-//       if (typeof customer.rawData.business_types === 'string') {
-//         try {
-//           businessTypes = JSON.parse(customer.rawData.business_types);
-//         } catch (e) {
-//           console.error('Failed to parse business_types:', e);
-//           businessTypes = [];
-//         }
-//       } else if (Array.isArray(customer.rawData.business_types)) {
-//         businessTypes = customer.rawData.business_types;
-//       }
-//     }
 
-//     const assessmentData = {
-//       surname: customer.name?.split(' ')[0] || '',
-//       other_names: customer.name?.split(' ').slice(1).join(' ') || '',
-//       phone: customer.phone || '',
-//       team: customer.team || '',
-//       marketing_type: customer.rawData.marketing_type || '',
-//       business_nature: customer.rawData.business_nature || '',
-//       business_premise_type: customer.rawData.business_premise_type || '',
-//       stock_type: customer.rawData.stock_type || '',
-//       stock_level: customer.rawData.stock_level || '',
-//       interest_level: customer.rawData.interest_level || '',
-//       personal_character: customer.rawData.personal_character || '',
-//       owns_business: customer.rawData.owns_business || '',
-//       business_legitimacy: customer.rawData.business_legitimacy || '',
-//       loan_purpose: customer.rawData.loan_purpose || '',
-//       business_types: businessTypes,
-//       category: customer.rawData.category || '', 
-//       assessed_by: customer.rawData.assessed_by || '',
-//       assessed_on: customer.rawData.assessed_date || customer.rawData.assessment_date || '',
-//       assessed_at: customer.rawData.assessed_time || customer.rawData.assessment_time || '',
-//     };
-    
-//     console.log('Assessment Details:', assessmentData);
-//     console.log('Business Types:', businessTypes);
-//     console.log('Category:', assessmentData.category);
-    
-//     setAssessmentDetails(assessmentData);
-//     setApproveModalVisible(true);
-//   } else {
-//     Alert.alert('Error', 'Customer data not available');
-//   }
-// };
  const openApproveModal = async () => {
   try {
     // Show loading state
@@ -1235,7 +1145,7 @@ const handleBMApproval = async () => {
     
     setCustomer({
       ...customer,
-      status: 'Pending HQ Approval',  // Status 5
+      status: 'Pending HQ Approval',  
     });
     
     setBmApprovalModalVisible(false);
@@ -1477,6 +1387,30 @@ const removeBusinessType = (index) => {
 
 const handleSubmitAssessment = async () => {
   try {
+    const filledBusinessTypes = assessmentData.business_types.filter(bt => bt.trim() !== '');
+    
+    if (filledBusinessTypes.length === 0) {
+      Alert.alert(
+        'Missing Business Type', 
+        'Please enter at least one business type by typing and selecting from the suggestions.',
+        [{ text: 'OK' }]
+      );
+      return; // STOP HERE - don't submit
+    }
+
+    // ✅ CHECK 2: All business types must match API data
+    const invalidBusinessTypes = filledBusinessTypes.filter(bt => {
+      return !businessTypeOptions.includes(bt);
+    });
+
+    if (invalidBusinessTypes.length > 0) {
+      Alert.alert(
+        'Invalid Business Type(s)',
+        `These business types are not valid:\n\n"${invalidBusinessTypes.join('"\n"')}"\n\nYou must select from the dropdown suggestions that appear as you type. If no suggestions appear, that business type is not in our system.`,
+        [{ text: 'OK' }]
+      );
+      return; // STOP HERE - don't submit
+    }
     const token = await AsyncStorage.getItem('token');
     
     const formData = new FormData();
@@ -2465,14 +2399,23 @@ const handleSubmitAssessment = async () => {
                 </View>
               </View>
 
-              {assessmentData.business_types.map((businessType, index) => (
+              {assessmentData.business_types.map((businessType, index) => {
+              // ✅ Check if what they typed matches API data
+              const isInvalid = businessType.trim() !== '' && 
+                              !businessTypeOptions.includes(businessType);
+              
+              return (
                 <View key={index} style={styles.businessTypeSection}>
                   <View style={styles.businessTypeRow}>
                     <TextInput
-                      style={[styles.textInput, { flex: 1 }]}
+                      style={[
+                        styles.textInput, 
+                        { flex: 1 },
+                        isInvalid && styles.invalidInput  // RED border if invalid
+                      ]}
                       value={businessType}
                       onChangeText={(text) => handleBusinessTypeSearch(text, index)}
-                      placeholder="Start typing business type"
+                      placeholder="Start typing business type..."
                       onFocus={() => {
                         if (businessType.trim().length > 0) {
                           const filtered = businessTypeOptions.filter(type =>
@@ -2482,7 +2425,6 @@ const handleSubmitAssessment = async () => {
                           setShowBusinessTypeSuggestions(filtered.length > 0);
                         }
                       }}
-                      
                     />
                     {assessmentData.business_types.length > 1 && (
                       <TouchableOpacity 
@@ -2493,6 +2435,16 @@ const handleSubmitAssessment = async () => {
                       </TouchableOpacity>
                     )}
                   </View>
+                  
+                  {/* ✅ Show warning if user typed something not in API */}
+                  {isInvalid && (
+                    <View style={styles.validationWarning}>
+                      <Ionicons name="warning" size={16} color="#D32F2F" />
+                      <Text style={styles.validationWarningText}>
+                        Invalid! You must select from suggestions. If no suggestions appear, this business type doesn't exist in our system.
+                      </Text>
+                    </View>
+                  )}
                   
                   {/* Suggestions Dropdown */}
                   {showBusinessTypeSuggestions && filteredBusinessTypes.length > 0 && (
@@ -2507,7 +2459,7 @@ const handleSubmitAssessment = async () => {
                             key={idx}
                             style={styles.suggestionItem}
                             onPress={() => selectBusinessType(type, index)}
-                            activeOpacity={0.7}  // Add visual feedback
+                            activeOpacity={0.7}
                           >
                             <Text style={styles.suggestionText}>{type}</Text>
                           </TouchableOpacity>
@@ -2527,7 +2479,8 @@ const handleSubmitAssessment = async () => {
                     </View>
                   )}
                 </View>
-              ))}
+              );
+            })}
 
               {/* Category Radio Buttons - Separate Section */}
               <Text style={[styles.inputLabel, { marginTop: 16 }]}>Category</Text>
@@ -2794,23 +2747,14 @@ const handleSubmitAssessment = async () => {
                   onValueChange={(value) => setSelectedApprover(value)}
                   style={styles.picker}
                 >
-                  <Picker.Item label="-- Select --" value="" />
-                  {users.map((user, index) => {
-                    const userName = typeof user === 'string' 
-                      ? user 
-                      : (user.name || user.full_name || user.username || `User ${index + 1}`);
-                    const userId = typeof user === 'string' 
-                      ? userName 
-                      : (user.id || userName);
-                    
-                    return (
-                      <Picker.Item 
-                        key={index} 
-                        label={userName} 
-                        value={userId} 
-                      />
-                    );
-                  })}
+                  {currentUser ? (
+                    <Picker.Item 
+                      label={currentUser.name || currentUser.full_name || currentUser.username || 'Current User'} 
+                      value={currentUser.id} 
+                    />
+                  ) : (
+                    <Picker.Item label="Loading..." value="" />
+                  )}
                 </Picker>
               </View>
 
@@ -2818,7 +2762,7 @@ const handleSubmitAssessment = async () => {
                 <TouchableOpacity 
                   style={styles.approveButtonLarge}
                   onPress={handleBMApproval}
-                  disabled={approvingBM || !selectedApprover}
+                  disabled={approvingBM || !currentUser}
                 >
                   {approvingBM ? (
                     <ActivityIndicator size="small" color="#fff" />
@@ -2880,23 +2824,14 @@ const handleSubmitAssessment = async () => {
                   onValueChange={(value) => setSelectedApprover(value)}
                   style={styles.picker}
                 >
-                  <Picker.Item label="-- Select --" value="" />
-                  {users.map((user, index) => {
-                    const userName = typeof user === 'string' 
-                      ? user 
-                      : (user.name || user.full_name || user.username || `User ${index + 1}`);
-                    const userId = typeof user === 'string' 
-                      ? userName 
-                      : (user.id || userName);
-                    
-                    return (
-                      <Picker.Item 
-                        key={index} 
-                        label={userName} 
-                        value={userId} 
-                      />
-                    );
-                  })}
+                  {currentUser ? (
+                    <Picker.Item 
+                      label={currentUser.name || currentUser.full_name || currentUser.username || 'Current User'} 
+                      value={currentUser.id} 
+                    />
+                  ) : (
+                    <Picker.Item label="Loading..." value="" />
+                  )}
                 </Picker>
               </View>
 
@@ -2904,7 +2839,7 @@ const handleSubmitAssessment = async () => {
                 <TouchableOpacity 
                   style={styles.approveButtonLarge}
                   onPress={handleHQApproval}
-                  disabled={approvingHQ || !selectedApprover}
+                  disabled={approvingHQ || !currentUser}
                 >
                   {approvingHQ ? (
                     <ActivityIndicator size="small" color="#fff" />
@@ -4287,7 +4222,38 @@ balanceHidden: {
   color: '#333',
   fontWeight: '500',
   letterSpacing: 2,
-}
+},
+balanceHidden: {
+  fontSize: 13,
+  color: '#333',
+  fontWeight: '500',
+  letterSpacing: 2,
+},
+
+invalidInput: {
+  borderColor: '#D32F2F',
+  borderWidth: 2,
+  backgroundColor: '#FFEBEE',
+},
+validationWarning: {
+  flexDirection: 'row',
+  alignItems: 'flex-start',
+  gap: 6,
+  backgroundColor: '#FFEBEE',
+  paddingHorizontal: 12,
+  paddingVertical: 8,
+  borderRadius: 6,
+  marginTop: -4,
+  marginBottom: 8,
+  borderLeftWidth: 3,
+  borderLeftColor: '#D32F2F',
+},
+validationWarningText: {
+  fontSize: 12,
+  color: '#D32F2F',
+  flex: 1,
+  lineHeight: 16,
+},
 });
 
 export default Profile;

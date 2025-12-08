@@ -27,7 +27,7 @@ const LoanManagementForm = ({ navigation, route }) => {
   const clientId = client_id;  
   
   // Form type state
-  const [formType, setFormType] = useState('loan'); // 'loan' or 'topup'
+  const [formType, setFormType] = useState('loan'); 
   const [isEditable, setIsEditable] = useState(true);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -39,8 +39,8 @@ const LoanManagementForm = ({ navigation, route }) => {
   const [products, setProducts] = useState([]);
   const [approvedLoanLimit, setApprovedLoanLimit] = useState('');
   const [availableCredit, setAvailableCredit] = useState(0);
-  const [requestedLoanAmount, setRequestedLoanAmount] = useState(''); // Renamed from actualLoanAmount
-  const [actualLoanLimit, setActualLoanLimit] = useState(''); // New field
+  const [requestedLoanAmount, setRequestedLoanAmount] = useState(''); 
+  const [actualLoanLimit, setActualLoanLimit] = useState(''); 
   const [repaymentDuration, setRepaymentDuration] = useState('');
   const [selectedImage, setSelectedImage] = useState(null);
   const [bde, setBde] = useState('');
@@ -84,14 +84,23 @@ const LoanManagementForm = ({ navigation, route }) => {
         `${API_BASE_URL}/api/loans/available-credit/${clientId}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      console.log('💳 Credit response:', creditResponse.data);
+      console.log('Credit response:', creditResponse.data);
 
       if (creditResponse.data.success) {
         const credit = creditResponse.data.available_credit;
         setAvailableCredit(credit);
         setCurrentLoanLimit(credit.toString());
-        // Set approved loan limit to be visible
-        setApprovedLoanLimit(credit.toLocaleString());
+      }
+
+      // Fetch the client's approved loan limit from client data
+      const clientResponse = await axios.get(
+        `${API_BASE_URL}/api/clients/${clientId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (clientResponse.data.client) {
+        const approvedLimit = clientResponse.data.client.approved_loan_limit || 0;
+        setApprovedLoanLimit(approvedLimit.toLocaleString());
       }
 
       // --- Fetch products ---

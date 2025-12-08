@@ -21,6 +21,8 @@ export default function ClientFormScreen() {
   const [showBranchDropdown, setShowBranchDropdown] = useState(false);
   const [teams, setTeams] = useState([]);
   const [showTeamDropdown, setShowTeamDropdown] = useState(false);
+  const [selectedBusinessTypeUnit, setSelectedBusinessTypeUnit] = useState('');
+  const [showBusinessTypeDropdown, setShowBusinessTypeDropdown] = useState(false);
 
 
   
@@ -206,6 +208,7 @@ const removeDependant = (id) => {
 }, []);
 
 
+
   const loadInitialData = async () => {
     try {
       setLoading(true);
@@ -269,6 +272,10 @@ const removeDependant = (id) => {
         const businessData = clientData.business_types_data || [];
         if (businessData.length > 0) {
           const firstBusiness = businessData[0];
+
+          if (firstBusiness.unit_of_measure) {
+          setSelectedBusinessTypeUnit(firstBusiness.unit_of_measure);
+        }
           setFormData(prev => ({
             ...prev,
             surname: clientData.name?.split(' ')[0] || '',
@@ -1339,7 +1346,9 @@ const removeDependant = (id) => {
       </View>
 
       <View style={styles.fullInput}>
-        <Text style={styles.label}>Average sales/Day (None)</Text>
+        <Text style={styles.label}>
+          Average sales/Day {selectedBusinessTypeUnit ? `(${selectedBusinessTypeUnit})` : '(None)'}
+        </Text>
         <TextInput 
           style={styles.input} 
           value={formData.average_sales_day}
