@@ -38,16 +38,16 @@ const actions = () => {
   const [clusters, setClusters] = useState([]);
   const [loadingViews, setLoadingViews] = useState(false);
   
-  const [collectionsData, setCollectionsData] = useState(null);
-  const [disbursementsData, setDisbursementsData] = useState(null);
+  //const [collectionsData, setCollectionsData] = useState(null);
+  //const [disbursementsData, setDisbursementsData] = useState(null);
   const [clientSummary, setClientSummary] = useState(null);
   const [loanSummary, setLoanSummary] = useState(null);
   
   const [dashboardData, setDashboardData] = useState({
-    updates: {
-      collections: 0,
-      disbursements: 0,
-    },
+    // updates: {
+    //   collections: 0,
+    //   disbursements: 0,
+    // },
     actions: [
       { id: 1, label: 'Add a new Customer', icon: 'person-add', color: '#D1F4F7', iconColor: '#00BCD4', borderColor: '#00BCD4', route: '/newlead' },
       { id: 2, label: 'Allocate Customer', icon: 'sync', color: '#D1F4F7', iconColor: '#00BCD4', borderColor: '#00BCD4', count: 0, route: '/client_summary' },
@@ -283,74 +283,58 @@ const actions = () => {
 
       const token = await AsyncStorage.getItem("token");
 
-      // Build query params for collections and disbursements
-      let queryParams = `period=${dateFilter}`;
-      if (viewType === 'branch' && selectedView) {
-        queryParams += `&branch_id=${selectedView.id}`;
-      } else if (viewType === 'cluster' && selectedView) {
-        queryParams += `&cluster_id=${selectedView.id}`;
-      }
+      // // Build query params for collections and disbursements
+      // let queryParams = `period=${dateFilter}`;
+      // if (viewType === 'branch' && selectedView) {
+      //   queryParams += `&branch_id=${selectedView.id}`;
+      // } else if (viewType === 'cluster' && selectedView) {
+      //   queryParams += `&cluster_id=${selectedView.id}`;
+      // }
 
       // Fetch all data in parallel
-      const [collectionsResponse, disbursementsResponse, clientSum, loanSum] = await Promise.all([
-        fetch(`${API_BASE_URL}/api/collections?${queryParams}`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          credentials: 'include',
-        }),
-        fetch(`${API_BASE_URL}/api/disbursements?${queryParams}`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          credentials: 'include',
-        }),
+      const [clientSum, loanSum] = await Promise.all([
         fetchClientSummary(token),
         fetchLoanSummary(token)
       ]);
 
-      const collectionsResult = await collectionsResponse.json();
-      const disbursementsResult = await disbursementsResponse.json();
+      // const collectionsResult = await collectionsResponse.json();
+      // const disbursementsResult = await disbursementsResponse.json();
 
       // Update collections and disbursements
-      if (collectionsResult.success && collectionsResult.payload) {
-        setCollectionsData(collectionsResult.payload);
-        const totalCollections = calculateTotal(collectionsResult.payload);
+      // if (collectionsResult.success && collectionsResult.payload) {
+      //   setCollectionsData(collectionsResult.payload);
+      //   const totalCollections = calculateTotal(collectionsResult.payload);
         
-        setDashboardData(prev => ({
-          ...prev,
-          updates: {
-            ...prev.updates,
-            collections: totalCollections
-          }
-        }));
-      }
+      //   setDashboardData(prev => ({
+      //     ...prev,
+      //     updates: {
+      //       ...prev.updates,
+      //       collections: totalCollections
+      //     }
+      //   }));
+      // }
 
-      if (disbursementsResult.success && disbursementsResult.payload) {
-        setDisbursementsData(disbursementsResult.payload);
-        const totalDisbursements = calculateTotal(disbursementsResult.payload);
+      // if (disbursementsResult.success && disbursementsResult.payload) {
+      //   setDisbursementsData(disbursementsResult.payload);
+      //   const totalDisbursements = calculateTotal(disbursementsResult.payload);
         
-        setDashboardData(prev => ({
-          ...prev,
-          updates: {
-            ...prev.updates,
-            disbursements: totalDisbursements
-          }
-        }));
-      }
+      //   setDashboardData(prev => ({
+      //     ...prev,
+      //     updates: {
+      //       ...prev.updates,
+      //       disbursements: totalDisbursements
+      //     }
+      //   }));
+      // }
 
       // Update action counts based on client and loan summaries
       if (clientSum || loanSum) {
         updateActionCounts(clientSum, loanSum);
       }
 
-      if (!collectionsResult.success || !disbursementsResult.success) {
-        throw new Error('Failed to fetch dashboard data');
-      }
+      // if (!collectionsResult.success || !disbursementsResult.success) {
+      //   throw new Error('Failed to fetch dashboard data');
+      // }
 
     } catch (err) {
       console.error('Error fetching dashboard data:', err);
@@ -448,21 +432,21 @@ const actions = () => {
   }));
 };
 
-  const calculateTotal = (groupedData) => {
-    if (!groupedData) return 0;
+  // const calculateTotal = (groupedData) => {
+  //   if (!groupedData) return 0;
     
-    let total = 0;
+  //   let total = 0;
     
-    Object.values(groupedData).forEach(items => {
-      if (Array.isArray(items)) {
-        items.forEach(item => {
-          total += parseFloat(item.amount || 0);
-        });
-      }
-    });
+  //   Object.values(groupedData).forEach(items => {
+  //     if (Array.isArray(items)) {
+  //       items.forEach(item => {
+  //         total += parseFloat(item.amount || 0);
+  //       });
+  //     }
+  //   });
     
-    return Math.round(total);
-  };
+  //   return Math.round(total);
+  // };
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -539,32 +523,32 @@ const actions = () => {
     }
   };
 
-  const renderUpdateCard = (title, value, color, icon, isLoading) => (
-    <View style={[styles.updateCard, { backgroundColor: color }]}>
-      <View style={[styles.updateCardIconContainer, { backgroundColor: color === '#4CAF50' ? '#66BB6A' : '#42A5F5' }]}>
-        <Ionicons name={icon} size={22} color="white" />
-      </View>
-      <Text style={styles.updateCardTitle}>{title}</Text>
+  // const renderUpdateCard = (title, value, color, icon, isLoading) => (
+  //   <View style={[styles.updateCard, { backgroundColor: color }]}>
+  //     <View style={[styles.updateCardIconContainer, { backgroundColor: color === '#4CAF50' ? '#66BB6A' : '#42A5F5' }]}>
+  //       <Ionicons name={icon} size={22} color="white" />
+  //     </View>
+  //     <Text style={styles.updateCardTitle}>{title}</Text>
       
-      {isLoading ? (
-        <ActivityIndicator size="small" color="white" style={styles.updateCardLoader} />
-      ) : error ? (
-        <Text style={styles.updateCardError}>Error</Text>
-      ) : (
-        <Text style={styles.updateCardValue}>{formatNumber(value)}</Text>
-      )}
+  //     {isLoading ? (
+  //       <ActivityIndicator size="small" color="white" style={styles.updateCardLoader} />
+  //     ) : error ? (
+  //       <Text style={styles.updateCardError}>Error</Text>
+  //     ) : (
+  //       <Text style={styles.updateCardValue}>{formatNumber(value)}</Text>
+  //     )}
       
-      <TouchableOpacity 
-        style={[styles.updateCardFooter, { backgroundColor: color === '#4CAF50' ? '#66BB6A' : '#42A5F5' }]}
-        onPress={() => setShowFilterMenu(!showFilterMenu)}
-        activeOpacity={0.7}
-      >
-        <Ionicons name="calendar" size={14} color="white" />
-        <Text style={styles.updateCardFooterText}>{getFilterLabel()}</Text>
-        <Ionicons name="chevron-down" size={14} color="white" style={{ marginLeft: 4 }} />
-      </TouchableOpacity>
-    </View>
-  );
+  //     <TouchableOpacity 
+  //       style={[styles.updateCardFooter, { backgroundColor: color === '#4CAF50' ? '#66BB6A' : '#42A5F5' }]}
+  //       onPress={() => setShowFilterMenu(!showFilterMenu)}
+  //       activeOpacity={0.7}
+  //     >
+  //       <Ionicons name="calendar" size={14} color="white" />
+  //       <Text style={styles.updateCardFooterText}>{getFilterLabel()}</Text>
+  //       <Ionicons name="chevron-down" size={14} color="white" style={{ marginLeft: 4 }} />
+  //     </TouchableOpacity>
+  //   </View>
+  // );
 
   const renderActionItem = (action) => (
     <TouchableOpacity
@@ -777,7 +761,7 @@ const actions = () => {
         </View>
 
         {/* Updates Section */}
-        <View style={styles.updatesSection}>
+        {/* <View style={styles.updatesSection}>
           <View style={styles.sectionHeader}>
             <Ionicons name="trending-up" size={24} color="#2196F3" />
             <Text style={styles.sectionTitle}>Updates</Text>
@@ -800,7 +784,7 @@ const actions = () => {
           </View>
           
           {/* Filter Menu */}
-          {showFilterMenu && (
+          {/* {showFilterMenu && (
             <View style={styles.filterMenu}>
               <TouchableOpacity 
                 style={[styles.filterOption, dateFilter === 'today' && styles.filterOptionActive]}
@@ -822,7 +806,7 @@ const actions = () => {
               </TouchableOpacity>
             </View>
           )}
-        </View>
+        </View>  */}
 
         {/* My Actions Section */}
         <View style={styles.actionsSection}>

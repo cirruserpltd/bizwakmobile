@@ -43,6 +43,7 @@ export default function ClientFormScreen() {
     business_type: '',
     category: '',
     business_size: '',
+    average_sales_day: '',
     is_registered: '',
     is_licensed: '',
     other_licenses: '',
@@ -153,6 +154,17 @@ const removeDependant = (id) => {
     spouse_awareness: '',
     suspicious_activity: '',
     any_other_home_checks_info: ''
+  });
+  const [accountDetails, setAccountDetails] = useState({
+    account_number: '',
+    current_score: '',
+    month_affordability: '',
+    highest_amount: '',
+    lowest_amount: '',
+    gambling: '',
+    active_mfi_loans: '',
+    average_amount: '',
+    business_activities: ''
   });
   const [guarantors, setGuarantors] = useState([]);
   const [accounts, setAccounts] = useState([]);
@@ -405,8 +417,8 @@ const removeDependant = (id) => {
       textFormData.append('alias', formData.alias || '');
       textFormData.append('branch_id', formData.branch_id || '');
       textFormData.append('im_team_id', formData.im_team_id || '');
-      textFormData.append('gender', formData.gender);
-      textFormData.append('marital_status', formData.marital_status);
+      textFormData.append('gender', formData.gender || 'Male');
+      textFormData.append('marital_status', formData.marital_status || '');
       textFormData.append('created_at', formData.created_at);
       
       // Next of Kin - match web app format
@@ -427,25 +439,26 @@ const removeDependant = (id) => {
         business_name: formData.business_name,
         business_type: formData.business_type,
         category: formData.category,
-        business_size: formData.business_size.toLowerCase(), // Convert to lowercase
-        business_owner: formData.ownership.toLowerCase(), // Changed from ownership to business_owner
+        business_size: formData.business_size.toLowerCase(), 
+        average_sales_day: formData.average_sales_day || '',
+        business_owner: formData.ownership.toLowerCase(), 
         is_registered: formData.is_registered === 'Yes' ? '1' : '0', // Convert to 1/0
         is_licensed: formData.is_licensed === 'Yes' ? '1' : '0', // Convert to 1/0
         other_license: formData.other_licenses === 'Yes' ? '1' : '0', // Changed from other_licenses to other_license
-        business_type_id: '', // Add if you have this value
-        business_class_id: '', // Add if you have this value
-        expected_profit: '' // Add if you have this value
+        business_type_id: '', 
+        business_class_id: '', 
+        expected_profit: ''
       }];
       textFormData.append('business_types_data', JSON.stringify(businessTypesData));
       
       // Perishable Stock - FIXED format
       if (perishableStock.length > 0 && perishableStock[0].product_name) {
         const formattedPerishableStock = perishableStock.map(item => ({
-          stock_name: item.product_name, // Changed from product_name to stock_name
-          quantity: item.quantity,
+          stock_name: item.product_name,
+          quantity: parseFloat(item.quantity) || 0,
           unit_of_measure: item.unit_of_measure,
-          price_per_unit: item.price_per_unit
-          // Remove total_value as web app doesn't include it
+          price_per_unit: parseFloat(item.price_per_unit) || 0,
+          value: parseFloat(item.total_value) || 0
         }));
         textFormData.append('perishable_stock', JSON.stringify(formattedPerishableStock));
       }
@@ -453,11 +466,11 @@ const removeDependant = (id) => {
       // Non-Perishable Stock - FIXED format
       if (nonPerishableStock.length > 0 && nonPerishableStock[0].product_name) {
         const formattedNonPerishableStock = nonPerishableStock.map(item => ({
-          stock_name: item.product_name, // Changed from product_name to stock_name
-          quantity: item.quantity,
+          stock_name: item.product_name,
+          quantity: parseFloat(item.quantity) || 0,
           unit_of_measure: item.unit_of_measure,
-          price_per_unit: item.price_per_unit
-          // Remove total_value as web app doesn't include it
+          price_per_unit: parseFloat(item.price_per_unit) || 0,
+          value: parseFloat(item.total_value) || 0
         }));
         textFormData.append('non_perishable_stock', JSON.stringify(formattedNonPerishableStock));
       }
@@ -465,22 +478,22 @@ const removeDependant = (id) => {
       // Asset Items - FIXED format
       if (assetItems.length > 0 && assetItems[0].product_name) {
         const formattedAssetItems = assetItems.map((item, index) => ({
-          asset_name: item.product_name, // Changed from product_name to asset_name
+          asset_name: item.product_name,
           quantity: item.quantity,
           price_per_unit: item.price_per_unit,
-          asset_image: `asset_items_imgs_${index}` // Add image reference
-          // Remove unit_of_measure and total_value
+          value: parseFloat(item.total_value) || 0,
+          asset_image: `asset_items_imgs_${index}`
         }));
         textFormData.append('asset_items', JSON.stringify(formattedAssetItems));
       }
       
       // Business Checks - FIXED format with lowercase values
-      if (Object.keys(businessChecks).length > 0) {
+       if (Object.keys(businessChecks).length > 0) {
         const formattedBusinessChecks = {
-          client_fourthcoming_with_info: businessChecks.client_forthcoming === 'Yes', // Fixed field name
-          presence_of_active_sales: businessChecks.active_sales_activities === 'Yes',
-          premises_well_kept: businessChecks.premises_well_kept === 'Yes',
-          would_you_lend: businessChecks.would_lend === 'Yes',
+          client_forthcoming: businessChecks.client_forthcoming || '',
+          active_sales_activities: businessChecks.active_sales_activities || '',
+          premises_well_kept: businessChecks.premises_well_kept || '',
+          would_lend: businessChecks.would_lend || '',
           any_other_biz_checks_info: businessChecks.any_other_biz_checks_info || 'NONE'
         };
         textFormData.append('business_checks', JSON.stringify(formattedBusinessChecks));
@@ -502,13 +515,13 @@ const removeDependant = (id) => {
       // Home Assets (Chattels) - FIXED format
       if (assets.length > 0 && assets[0].asset_name) {
         const formattedAssets = assets.map((asset, index) => ({
-          name: asset.asset_name, // Changed from asset_name to name
-          brand: asset.brand_model, // Changed from brand_model to brand
+          name: asset.asset_name,
+          brand: asset.brand_model,
           serial_no: asset.serial_no,
           description: asset.description,
           condition: asset.condition,
           value: asset.value,
-          asset_image: `chattel_image_${index}` // Changed from chattle_imgs_* to chattel_image_*
+          asset_image: `chattel_image_${index}`
         }));
         textFormData.append('assets', JSON.stringify(formattedAssets));
       }
@@ -516,11 +529,11 @@ const removeDependant = (id) => {
       // Home Checks - FIXED format with lowercase values
       if (Object.keys(homeChecks).length > 0) {
         const formattedHomeChecks = {
-          client_nervous_within_home: homeChecks.client_nervous_within_home === 'Yes',
-          item_persons_proving_ownership: homeChecks.item_persons_proving_ownership === 'Yes',
+          client_nervous_within_home: homeChecks.client_nervous_within_home || '',
+          item_persons_proving_ownership: homeChecks.item_persons_proving_ownership || '',
           item_or_persons_description: homeChecks.item_or_persons_description || '',
-          spouse_awareness: homeChecks.spouse_awareness === 'Yes',
-          suspicious_activity: homeChecks.suspicious_activity === 'Yes',
+          spouse_awareness: homeChecks.spouse_awareness || '',
+          suspicious_activity: homeChecks.suspicious_activity || '',
           any_other_home_checks_info: homeChecks.any_other_home_checks_info || 'none'
         };
         textFormData.append('home_checks', JSON.stringify(formattedHomeChecks));
@@ -529,37 +542,61 @@ const removeDependant = (id) => {
     
     if (step === 4) {
       // Agreement Checks - FIXED format with lowercase values
-      const agreementChecks = {
-        willing_to_sign: formData.agreement_one === 'Yes',
-        understands_terms: formData.agreement_two === 'Yes',
-        aware_consequences: formData.agreement_three === 'Yes'
+       const agreementChecks = {
+        client_willing_to_sign: formData.agreement_one || '',
+        client_understand_agreement: formData.agreement_two || '',
+        client_understand_consequences: formData.agreement_three || ''
       };
       textFormData.append('agreement_checks', JSON.stringify(agreementChecks));
-      
+          
       // Guarantor Details
-      const guarantorDetails = [{
-        name: formData.guarantor_name,
-        id_number: formData.guarantor_id,
-        phone: formData.guarantor_phone,
-        location: formData.guarantor_location,
-        business_location: formData.guarantor_business_location,
-        lat: formData.guarantor_lat,
-        long: formData.guarantor_long,
-        max_amount: formData.guarantor_max_amount
+     const guarantorDetails = [{
+        guarantor_name: formData.guarantor_name || '',
+        guarantor_id_no: formData.guarantor_id || '',
+        guarantor_phone_no: formData.guarantor_phone || '',
+        guarantor_village: formData.guarantor_location || '',
+        guarantor_landmark: formData.guarantor_nearest_landmark || '',
+        guarantor_business_location: formData.guarantor_business_location || '',
+        g_lat_coords: formData.guarantor_lat || '',
+        g_long_coords: formData.guarantor_long || '',
+        guaranteed_amount: formData.guarantor_max_amount || '',
+        sign_img: 'guarantor_sign_img_0',
+        agreement_img: 'guarantor_agreement_0',
+        pic_img: 'guarantor_pic_0',
+        front_id_img: 'guarantor_front_id_0',
+        back_id_img: 'guarantor_back_id_0'                              
       }];
       textFormData.append('guarantors', JSON.stringify(guarantorDetails));
     }
     
     if (step === 5) {
-      // Affordability
-      textFormData.append('requested_amount', formData.requested_amount);
-      textFormData.append('branch_limit', formData.branch_limit);
-      textFormData.append('current_limit', formData.current_limit);
-      textFormData.append('average_score', formData.average_score);
+      // Build the accounts array with all the data
+      const accountsData = [{
+        account_number: formData.phone || '',  // Using phone as account number
+        current_score: accountDetails.current_score || '0',
+        month_affordability: accountDetails.month_affordability || '0',
+        highest_amount: accountDetails.highest_amount || '0',
+        lowest_amount: accountDetails.lowest_amount || '0',
+        gambling: accountDetails.gambling || 'no',
+        active_mfi_loans: accountDetails.active_mfi_loans || '0',
+        average_amount: accountDetails.average_amount || '0',
+        business_activities: accountDetails.business_activities || 'no'
+      }];
       
-      if (accounts.length > 0) {
-        textFormData.append('accounts', JSON.stringify(accounts));
-      }
+      // Debug log to verify data before sending
+      console.log('Account Details State:', accountDetails);
+      console.log('Accounts Data to Send:', accountsData);
+      
+      // Send all affordability fields
+      textFormData.append('requested_amount', formData.requested_amount || '0');
+      textFormData.append('branch_limit', formData.branch_limit || '0');
+      textFormData.append('current_limit', formData.current_limit || '0');
+      textFormData.append('average_score', accountDetails.current_score || '0');
+      
+      // CRITICAL: Send the accounts array
+      textFormData.append('accounts', JSON.stringify(accountsData));
+      
+      console.log('FormData accounts:', JSON.stringify(accountsData));
     }
     
     console.log('Sending data for step', step);
@@ -1030,6 +1067,16 @@ const removeDependant = (id) => {
             keyboardType="phone-pad"
           />
         </View>
+      </View>
+      <View style={styles.fullInput}>
+        <Text style={styles.label}>Alt Phone No. (Optional)</Text>
+        <TextInput
+          style={styles.input}
+          value={formData.alt_phone_no}
+          onChangeText={(text) => setFormData({...formData, alt_phone_no: text})}
+          keyboardType="phone-pad"
+          placeholder="Enter alternative phone number"
+        />
       </View>
 
       <View style={styles.fullInput}>
@@ -1628,14 +1675,6 @@ const removeDependant = (id) => {
           </View>
 
           <View style={styles.row}>
-            <View style={styles.halfInput}>
-              <Text style={styles.label}>Unit of Measure</Text>
-              <TextInput 
-                style={styles.input}
-                value={item.unit_of_measure}
-                onChangeText={(text) => updateAssetItem(item.id, 'unit_of_measure', text)}
-              />
-            </View>
             <View style={styles.halfInput}>
               <Text style={styles.label}>Price per Unit</Text>
               <TextInput 
@@ -2322,9 +2361,6 @@ const removeDependant = (id) => {
 
       <View style={styles.sectionHeader}>
         <Text style={styles.subsectionTitle}>Account Details</Text>
-        <TouchableOpacity style={styles.addButtonBlue}>
-          <Ionicons name="add" size={24} color="#fff" />
-        </TouchableOpacity>
       </View>
 
       <View style={styles.fullInput}>
@@ -2343,6 +2379,8 @@ const removeDependant = (id) => {
           <Text style={styles.label}>Overall Score (0 - 900)</Text>
           <TextInput
             style={styles.input}
+            value={accountDetails.current_score}
+            onChangeText={(text) => setAccountDetails({...accountDetails, current_score: text})}
             placeholder="0"
             keyboardType="numeric"
           />
@@ -2351,6 +2389,8 @@ const removeDependant = (id) => {
           <Text style={styles.label}>Affordability/month</Text>
           <TextInput
             style={styles.input}
+            value={accountDetails.month_affordability}
+            onChangeText={(text) => setAccountDetails({...accountDetails, month_affordability: text})}
             placeholder="0"
             keyboardType="numeric"
           />
@@ -2362,6 +2402,8 @@ const removeDependant = (id) => {
           <Text style={styles.label}>Highest Amount</Text>
           <TextInput
             style={styles.input}
+            value={accountDetails.highest_amount}
+            onChangeText={(text) => setAccountDetails({...accountDetails, highest_amount: text})}
             placeholder="0"
             keyboardType="numeric"
           />
@@ -2370,6 +2412,8 @@ const removeDependant = (id) => {
           <Text style={styles.label}>Lowest Amount</Text>
           <TextInput
             style={styles.input}
+            value={accountDetails.lowest_amount}
+            onChangeText={(text) => setAccountDetails({...accountDetails, lowest_amount: text})}
             placeholder="0"
             keyboardType="numeric"
           />
@@ -2379,15 +2423,29 @@ const removeDependant = (id) => {
       <View style={styles.row}>
         <View style={styles.halfInput}>
           <Text style={styles.label}>Does the client gamble?</Text>
-          <TextInput
-            style={styles.input}
-            placeholder=""
-          />
+          <View style={styles.radioGroup}>
+            <TouchableOpacity 
+              style={styles.radioOption}
+              onPress={() => setAccountDetails({...accountDetails, gambling: 'yes'})}
+            >
+              <View style={[styles.radio, accountDetails.gambling === 'yes' && styles.radioSelected]} />
+              <Text style={styles.radioLabel}>Yes</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.radioOption}
+              onPress={() => setAccountDetails({...accountDetails, gambling: 'no'})}
+            >
+              <View style={[styles.radio, accountDetails.gambling === 'no' && styles.radioSelected]} />
+              <Text style={styles.radioLabel}>No</Text>
+            </TouchableOpacity>
+          </View>
         </View>
         <View style={styles.halfInput}>
           <Text style={styles.label}>No of MFIs (active loans)</Text>
           <TextInput
             style={styles.input}
+            value={accountDetails.active_mfi_loans}
+            onChangeText={(text) => setAccountDetails({...accountDetails, active_mfi_loans: text})}
             placeholder="0"
             keyboardType="numeric"
           />
@@ -2399,16 +2457,30 @@ const removeDependant = (id) => {
           <Text style={styles.label}>Loan range amount</Text>
           <TextInput
             style={styles.input}
+            value={accountDetails.average_amount}
+            onChangeText={(text) => setAccountDetails({...accountDetails, average_amount: text})}
             placeholder="0"
             keyboardType="numeric"
           />
         </View>
         <View style={styles.halfInput}>
           <Text style={styles.label}>Does client use MFI loans on business activities?</Text>
-          <TextInput
-            style={styles.input}
-            placeholder=""
-          />
+          <View style={styles.radioGroup}>
+            <TouchableOpacity 
+              style={styles.radioOption}
+              onPress={() => setAccountDetails({...accountDetails, business_activities: 'yes'})}
+            >
+              <View style={[styles.radio, accountDetails.business_activities === 'yes' && styles.radioSelected]} />
+              <Text style={styles.radioLabel}>Yes</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.radioOption}
+              onPress={() => setAccountDetails({...accountDetails, business_activities: 'no'})}
+            >
+              <View style={[styles.radio, accountDetails.business_activities === 'no' && styles.radioSelected]} />
+              <Text style={styles.radioLabel}>No</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
 
@@ -2434,6 +2506,8 @@ const removeDependant = (id) => {
           <Text style={styles.label}>Recommended amount (Branch)</Text>
           <TextInput
             style={styles.input}
+            value={formData.branch_limit}
+            onChangeText={(text) => setFormData({...formData, branch_limit: text})}
             placeholder="Enter amount"
             keyboardType="numeric"
           />
@@ -2443,12 +2517,12 @@ const removeDependant = (id) => {
       <View style={styles.affordabilityCard}>
         <View style={styles.affordabilityItem}>
           <Text style={styles.affordabilityLabel}>Calculated affordable Limit</Text>
-          <Text style={styles.affordabilityValue}>0</Text>
+          <Text style={styles.affordabilityValue}>{formData.branch_limit || '0'}</Text>
         </View>
         <View style={styles.affordabilityDivider} />
         <View style={styles.affordabilityItem}>
           <Text style={styles.affordabilityLabel}>Approved Loan Limit</Text>
-          <Text style={styles.affordabilityValueBold}>KSH 0.0</Text>
+          <Text style={styles.affordabilityValueBold}>KSH {formData.current_limit || '0.0'}</Text>
         </View>
       </View>
 
@@ -2456,6 +2530,8 @@ const removeDependant = (id) => {
         <Text style={styles.label}>Recommended amount (Input by QA)</Text>
         <TextInput
           style={[styles.input, styles.qaInputHighlight]}
+          value={formData.current_limit}
+          onChangeText={(text) => setFormData({...formData, current_limit: text})}
           placeholder="Enter amount"
           keyboardType="numeric"
         />

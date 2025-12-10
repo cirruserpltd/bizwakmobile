@@ -41,6 +41,23 @@ export default function HomeScreen() {
   const [clusters, setClusters] = useState([]);
   const [loadingViews, setLoadingViews] = useState(false);
 
+  const [cashBalanceData, setCashBalanceData] = useState(null);
+  const [cashBalanceLoading, setCashBalanceLoading] = useState(true);
+  const [cashBalanceError, setCashBalanceError] = useState(null);
+
+  const [paymentsSummary, setPaymentsSummary] = useState(null);
+  const [paymentsLoading, setPaymentsLoading] = useState(true);
+  const [paymentsError, setPaymentsError] = useState(null);
+
+  const [collectionsData, setCollectionsData] = useState(null);
+  const [disbursementsData, setDisbursementsData] = useState(null);
+  const [collectionsLoading, setCollectionsLoading] = useState(true);
+  const [disbursementsLoading, setDisbursementsLoading] = useState(true);
+  const [collectionsError, setCollectionsError] = useState(null);
+  const [disbursementsError, setDisbursementsError] = useState(null);
+  const [dateFilter, setDateFilter] = useState('mtd');
+  const [showFilterMenu, setShowFilterMenu] = useState(false);
+
   useEffect(() => {
     const today = new Date();
     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -57,18 +74,26 @@ export default function HomeScreen() {
 
   useEffect(() => {
     fetchIDRData();
+    fetchCashBalance();
+    fetchCollections();          
+    fetchDisbursements();        
     fetchCustomerSummary();
     fetchLoansSummary();
     fetchInstallmentsSummary();
-  }, [viewType, selectedView]);
+    fetchPaymentsSummary();
+  }, [viewType, selectedView, dateFilter]);
 
   const onRefresh = async () => {
     setRefreshing(true);
     await Promise.all([
       fetchIDRData(), 
+      fetchCashBalance(),
+      fetchCollections(),          
+      fetchDisbursements(),        
       fetchCustomerSummary(),
       fetchLoansSummary(),
-      fetchInstallmentsSummary()
+      fetchInstallmentsSummary(),
+      fetchPaymentsSummary()
     ]);
     setRefreshing(false);
   };
@@ -271,53 +296,243 @@ export default function HomeScreen() {
   };
 
   const fetchInstallmentsSummary = async () => {
-    try {
-      setInstallmentsLoading(true);
-      setInstallmentsError(null);
+  try {
+    setInstallmentsLoading(true);
+    setInstallmentsError(null);
 
-      const token = await AsyncStorage.getItem("token");
+    const token = await AsyncStorage.getItem("token");
 
-      let body = {};
-      
-      // Add filters based on view type
-      if (viewType === 'branch' && selectedView) {
-        body.branch = selectedView.id;
-      } else if (viewType === 'cluster' && selectedView) {
-        body.cluster = selectedView.id;
-      }
-
-      const response = await fetch(`${API_BASE_URL}/api/loans/getpaginatedinstallments/1/1`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        credentials: 'include',
-        body: JSON.stringify(body),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Installments summary error response:', errorText);
-        throw new Error(`HTTP ${response.status}: ${errorText}`);
-      }
-
-      const result = await response.json();
-
-      if (result.success && result.additional_data && result.additional_data.summary) {
-        setInstallmentsSummary(result.additional_data.summary);
-      } else if (result.success) {
-        setInstallmentsError('Summary data not found in response');
-      } else {
-        setInstallmentsError(result.error || 'Failed to fetch installments summary');
-      }
-    } catch (err) {
-      console.error('Error fetching installments summary:', err);
-      setInstallmentsError(err.message || 'Network error. Please try again.');
-    } finally {
-      setInstallmentsLoading(false);
+    // CHANGED: Use query params instead of body
+    let queryParams = '';
+    if (viewType === 'branch' && selectedView) {
+      queryParams = `?branch=${selectedView.id}`;
+    } else if (viewType === 'cluster' && selectedView) {
+      queryParams = `?cluster=${selectedView.id}`;
     }
-  };
+
+    // CHANGED: GET method with query params
+    const response = await fetch(`${API_BASE_URL}/api/loans/getpaginatedinstallments/1/1${queryParams}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Installments summary error response:', errorText);
+      throw new Error(`HTTP ${response.status}: ${errorText}`);
+    }
+
+    const result = await response.json();
+
+    if (result.success && result.additional_data && result.additional_data.summary) {
+      setInstallmentsSummary(result.additional_data.summary);
+    } else if (result.success) {
+      setInstallmentsError('Summary data not found in response');
+    } else {
+      setInstallmentsError(result.error || 'Failed to fetch installments summary');
+    }
+  } catch (err) {
+    console.error('Error fetching installments summary:', err);
+    setInstallmentsError(err.message || 'Network error. Please try again.');
+  } finally {
+    setInstallmentsLoading(false);
+  }
+};
+  const fetchCashBalance = async () => {
+  try {
+    setCashBalanceLoading(true);
+    setCashBalanceError(null);
+
+    const token = await AsyncStorage.getItem("token");
+
+    const queryParams = `period=mtd`;
+
+    const response = await fetch(`${API_BASE_URL}/api/cash_balance?${queryParams}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`HTTP ${response.status}: ${errorText}`);
+    }
+
+    const result = await response.json();
+    console.log("Cash Balance Payload:", result.payload);
+
+    if (result.success && result.payload) {
+      setCashBalanceData(result.payload);
+    } else {
+      setCashBalanceError(result.error || 'Failed to fetch cash balance');
+    }
+  } catch (err) {
+    console.error('Error fetching cash balance:', err);
+    setCashBalanceError(err.message || 'Network error. Please try again.');
+  } finally {
+    setCashBalanceLoading(false);
+  }
+};
+
+
+
+const fetchPaymentsSummary = async () => {
+  try {
+    setPaymentsLoading(true);
+    setPaymentsError(null);
+
+    const token = await AsyncStorage.getItem("token");
+
+    
+    let queryParams = '';
+    if (viewType === 'branch' && selectedView) {
+      queryParams = `?branch=${selectedView.id}`;
+    } else if (viewType === 'cluster' && selectedView) {
+      queryParams = `?cluster=${selectedView.id}`;
+    }
+
+    // CHANGED: GET method with query params
+    const response = await fetch(`${API_BASE_URL}/api/loans/getpaginatedpayments/1/1${queryParams}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Payments summary error response:', errorText);
+      throw new Error(`HTTP ${response.status}: ${errorText}`);
+    }
+
+    const result = await response.json();
+
+    if (result.success && result.additional_data && result.additional_data.summary) {
+      setPaymentsSummary(result.additional_data.summary);
+    } else if (result.success) {
+      setPaymentsError('Summary data not found in response');
+    } else {
+      setPaymentsError(result.error || 'Failed to fetch payments summary');
+    }
+  } catch (err) {
+    console.error('Error fetching payments summary:', err);
+    setPaymentsError(err.message || 'Network error. Please try again.');
+  } finally {
+    setPaymentsLoading(false);
+  }
+};
+
+const fetchCollections = async () => {
+  try {
+    setCollectionsLoading(true);
+    setCollectionsError(null);
+
+    const token = await AsyncStorage.getItem("token");
+
+    let queryParams = `period=${dateFilter}`;
+    if (viewType === 'branch' && selectedView) {
+      queryParams += `&branch_id=${selectedView.id}`;
+    } else if (viewType === 'cluster' && selectedView) {
+      queryParams += `&cluster_id=${selectedView.id}`;
+    }
+
+    const response = await fetch(`${API_BASE_URL}/api/collections?${queryParams}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Collections error response:', errorText);
+      throw new Error(`HTTP ${response.status}: ${errorText}`);
+    }
+
+    const result = await response.json();
+
+    if (result.success && result.payload) {
+      setCollectionsData(result.payload);
+    } else {
+      setCollectionsError(result.error || 'Failed to fetch collections');
+    }
+  } catch (err) {
+    console.error('Error fetching collections:', err);
+    setCollectionsError(err.message || 'Network error. Please try again.');
+  } finally {
+    setCollectionsLoading(false);
+  }
+};
+
+const fetchDisbursements = async () => {
+  try {
+    setDisbursementsLoading(true);
+    setDisbursementsError(null);
+
+    const token = await AsyncStorage.getItem("token");
+
+    let queryParams = `period=${dateFilter}`;
+    if (viewType === 'branch' && selectedView) {
+      queryParams += `&branch_id=${selectedView.id}`;
+    } else if (viewType === 'cluster' && selectedView) {
+      queryParams += `&cluster_id=${selectedView.id}`;
+    }
+
+    const response = await fetch(`${API_BASE_URL}/api/disbursements?${queryParams}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Disbursements error response:', errorText);
+      throw new Error(`HTTP ${response.status}: ${errorText}`);
+    }
+
+    const result = await response.json();
+
+    if (result.success && result.payload) {
+      setDisbursementsData(result.payload);
+    } else {
+      setDisbursementsError(result.error || 'Failed to fetch disbursements');
+    }
+  } catch (err) {
+    console.error('Error fetching disbursements:', err);
+    setDisbursementsError(err.message || 'Network error. Please try again.');
+  } finally {
+    setDisbursementsLoading(false);
+  }
+};
+
+const calculateTotal = (groupedData) => {
+  if (!groupedData) return 0;
+  
+  let total = 0;
+  
+  Object.values(groupedData).forEach(items => {
+    if (Array.isArray(items)) {
+      items.forEach(item => {
+        total += parseFloat(item.amount || 0);
+      });
+    }
+  });
+  
+  return Math.round(total);
+};
 
   const handleProfilePress = () => {
     router.push({ pathname: '/userProfile' });
@@ -582,107 +797,283 @@ export default function HomeScreen() {
     );
   };
 
-  const renderCustomerSummaryCard = () => {
-    if (customerLoading) {
-      return (
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Ionicons name="people-outline" size={18} color="#2D5BFF" />
-            <Text style={styles.cardTitle}>Customer Summary</Text>
-          </View>
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#2D5BFF" />
-            <Text style={styles.loadingText}>Loading customer data...</Text>
-          </View>
-        </View>
-      );
-    }
-
-    if (customerError) {
-      return (
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Ionicons name="people-outline" size={18} color="#2D5BFF" />
-            <Text style={styles.cardTitle}>Customer Summary</Text>
-          </View>
-          <View style={styles.errorContainer}>
-            <Ionicons name="alert-circle-outline" size={40} color="#FF4444" />
-            <Text style={styles.errorText}>{customerError}</Text>
-            <TouchableOpacity style={styles.retryButton} onPress={fetchCustomerSummary}>
-              <Text style={styles.retryButtonText}>Retry</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      );
-    }
-
-    if (!customerSummary) {
-      return (
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Ionicons name="people-outline" size={18} color="#2D5BFF" />
-            <Text style={styles.cardTitle}>Customer Summary</Text>
-          </View>
-          <Text style={styles.noDataText}>No customer data available</Text>
-        </View>
-      );
-    }
-
+  const renderBusinessUnitCard = () => {
+  if (cashBalanceLoading) {
     return (
       <View style={styles.card}>
         <View style={styles.cardHeader}>
-          <Ionicons name="people-outline" size={18} color="#2D5BFF" />
-          <Text style={styles.cardTitle}>Customer Summary</Text>
+          <Ionicons name="briefcase-outline" size={18} color="#2D5BFF" />
+          <Text style={styles.cardTitle}>Business Unit (BU)</Text>
         </View>
-
-        <View style={styles.customerRow}>
-          <View style={[styles.customerBox, { borderWidth: 1, borderColor: '#BDBDBD' }]}>
-            <Text style={styles.customerValue}>
-              {customerSummary.total_no_of_clients || 0}
-            </Text>
-            <Text style={styles.customerLabel}>Total Customers</Text>
-          </View>
-          <View style={[styles.customerBox, { backgroundColor: '#E8F5E9', borderWidth: 1, borderColor: '#00C853' }]}>
-            <Text style={[styles.customerValue, { color: '#00C853' }]}>
-              {customerSummary.total_active || 0}
-            </Text>
-            <Text style={styles.customerLabel}>Total Active</Text>
-          </View>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#2D5BFF" />
+          <Text style={styles.loadingText}>Loading BU data...</Text>
         </View>
-
-        <View style={styles.customerRow}>
-          <View style={[styles.customerBox, { backgroundColor: '#FFF3E0', borderWidth: 1, borderColor: '#FF9800' }]}>
-            <Text style={[styles.customerValue, { color: '#FF9800' }]}>
-              {customerSummary.total_dormant || 0}
-            </Text>
-            <Text style={styles.customerLabel}>Total Dormant</Text>
-          </View>
-          <View style={[styles.customerBox, { backgroundColor: '#FFEBEE', borderWidth: 1, borderColor: '#FF4444' }]}>
-            <Text style={[styles.customerValue, { color: '#FF4444' }]}>
-              {customerSummary.total_blacklisted || 0}
-            </Text>
-            <Text style={styles.customerLabel}>Total Blacklisted</Text>
-          </View>
-        </View>
-
-        {/* Additional customer stats */}
-        {/* <View style={styles.additionalStatsContainer}>
-          <View style={styles.statRow}>
-            <Text style={styles.statLabel}>Pending Assessment:</Text>
-            <Text style={styles.statValue}>{customerSummary.total_pending_assessment || 0}</Text>
-          </View>
-          <View style={styles.statRow}>
-            <Text style={styles.statLabel}>Pending Approval:</Text>
-            <Text style={styles.statValue}>{customerSummary.total_pending_approval || 0}</Text>
-          </View>
-          <View style={styles.statRow}>
-            <Text style={styles.statLabel}>Pending Onboarding:</Text>
-            <Text style={styles.statValue}>{customerSummary.total_pending_onboarding || 0}</Text>
-          </View>
-        </View> */}
       </View>
     );
-  };
+  }
+
+  if (cashBalanceError) {
+    return (
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <Ionicons name="briefcase-outline" size={18} color="#2D5BFF" />
+          <Text style={styles.cardTitle}>Business Unit (BU)</Text>
+        </View>
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle-outline" size={40} color="#FF4444" />
+          <Text style={styles.errorText}>{cashBalanceError}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={fetchCashBalance}>
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+  const branchName = Object.keys(cashBalanceData || {})[0];
+  const branchRecord = cashBalanceData?.[branchName]?.[0] || {}
+
+  return (
+    <View style={styles.card}>
+      <View style={styles.cardHeader}>
+        <Ionicons name="briefcase-outline" size={18} color="#2D5BFF" />
+        <Text style={styles.cardTitle}>Business Unit (BU)</Text>
+      </View>
+
+      <View style={styles.summaryRow}>
+        <View style={[styles.summaryBox, { backgroundColor: '#FFE0B2', borderColor: '#FF6F00' }]}>
+          <Text style={[styles.summaryValue, { color: '#E65100' }]}>
+            {(branchRecord.expenses || 0).toLocaleString('en-US', { minimumFractionDigits: 0 })}
+          </Text>
+          <Text style={styles.summaryLabel}>Expenses</Text>
+        </View>
+        <View style={[styles.summaryBox, { backgroundColor: '#E8F5E9', borderColor: '#00C853' }]}>
+          <Text style={[styles.summaryValue, { color: '#00C853' }]}>
+            {(branchRecord.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 0 })}
+          </Text>
+          <Text style={styles.summaryLabel}>Cash Balance</Text>
+        </View>
+      </View>
+    </View>
+  );
+};
+
+  
+
+ const renderCollectionsDisbursementsCards = () => {
+  const collectionsTotal = calculateTotal(collectionsData);
+  const disbursementsTotal = calculateTotal(disbursementsData);
+
+  return (
+    <View style={styles.updatesSection}>
+      <View style={styles.sectionHeader}>
+        
+      </View>
+      
+      <View style={styles.updateCardsContainer}>
+        {/* Collections Card */}
+        <View style={[styles.updateCard, { backgroundColor: '#4CAF50' }]}>
+          <View style={[styles.updateCardIconContainer, { backgroundColor: '#66BB6A' }]}>
+            <Ionicons name="trending-up" size={22} color="white" />
+          </View>
+          <Text style={styles.updateCardTitle}>Collections</Text>
+          
+          {collectionsLoading ? (
+            <ActivityIndicator size="small" color="white" style={styles.updateCardLoader} />
+          ) : collectionsError ? (
+            <Text style={styles.updateCardError}>Error</Text>
+          ) : (
+            <Text style={styles.updateCardValue}>
+              {collectionsTotal.toLocaleString('en-US', { minimumFractionDigits: 0 })}
+            </Text>
+          )}
+          
+          <TouchableOpacity 
+            style={[styles.updateCardFooter, { backgroundColor: '#66BB6A' }]}
+            onPress={() => setShowFilterMenu(!showFilterMenu)}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="calendar" size={14} color="white" />
+            <Text style={styles.updateCardFooterText}>
+              {dateFilter === 'today' ? 'Today' : dateFilter === 'wtd' ? 'WTD' : 'MTD'}
+            </Text>
+            <Ionicons name="chevron-down" size={14} color="white" style={{ marginLeft: 4 }} />
+          </TouchableOpacity>
+        </View>
+
+        {/* Disbursements Card */}
+        <View style={[styles.updateCard, { backgroundColor: '#2196F3' }]}>
+          <View style={[styles.updateCardIconContainer, { backgroundColor: '#42A5F5' }]}>
+            <Ionicons name="trending-down" size={22} color="white" />
+          </View>
+          <Text style={styles.updateCardTitle}>Disbursements</Text>
+          
+          {disbursementsLoading ? (
+            <ActivityIndicator size="small" color="white" style={styles.updateCardLoader} />
+          ) : disbursementsError ? (
+            <Text style={styles.updateCardError}>Error</Text>
+          ) : (
+            <Text style={styles.updateCardValue}>
+              {disbursementsTotal.toLocaleString('en-US', { minimumFractionDigits: 0 })}
+            </Text>
+          )}
+          
+          <TouchableOpacity 
+            style={[styles.updateCardFooter, { backgroundColor: '#42A5F5' }]}
+            onPress={() => setShowFilterMenu(!showFilterMenu)}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="calendar" size={14} color="white" />
+            <Text style={styles.updateCardFooterText}>
+              {dateFilter === 'today' ? 'Today' : dateFilter === 'wtd' ? 'WTD' : 'MTD'}
+            </Text>
+            <Ionicons name="chevron-down" size={14} color="white" style={{ marginLeft: 4 }} />
+          </TouchableOpacity>
+        </View>
+      </View>
+      
+      {/* Filter Menu */}
+      {showFilterMenu && (
+        <View style={styles.filterMenu}>
+          <TouchableOpacity 
+            style={[styles.filterOption, dateFilter === 'today' && styles.filterOptionActive]}
+            onPress={() => {
+              setDateFilter('today');
+              setShowFilterMenu(false);
+            }}
+          >
+            <Text style={[styles.filterOptionText, dateFilter === 'today' && styles.filterOptionTextActive]}>
+              Today
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.filterOption, dateFilter === 'wtd' && styles.filterOptionActive]}
+            onPress={() => {
+              setDateFilter('wtd');
+              setShowFilterMenu(false);
+            }}
+          >
+            <Text style={[styles.filterOptionText, dateFilter === 'wtd' && styles.filterOptionTextActive]}>
+              Week to Date
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.filterOption, dateFilter === 'mtd' && styles.filterOptionActive]}
+            onPress={() => {
+              setDateFilter('mtd');
+              setShowFilterMenu(false);
+            }}
+          >
+            <Text style={[styles.filterOptionText, dateFilter === 'mtd' && styles.filterOptionTextActive]}>
+              Month to Date
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
+  );
+};
+
+const renderStatsSummaryCard = () => {
+  const isAnyLoading = customerLoading || loansLoading || installmentsLoading || paymentsLoading;
+  const hasAnyError = customerError || loansError || installmentsError || paymentsError;
+
+  if (isAnyLoading) {
+    return (
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <Ionicons name="stats-chart-outline" size={18} color="#2D5BFF" />
+          <Text style={styles.cardTitle}>Summary</Text>
+        </View>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#2D5BFF" />
+          <Text style={styles.loadingText}>Loading summary data...</Text>
+        </View>
+      </View>
+    );
+  }
+
+  if (hasAnyError) {
+    return (
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <Ionicons name="stats-chart-outline" size={18} color="#2D5BFF" />
+          <Text style={styles.cardTitle}>Summary Statistics</Text>
+        </View>
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle-outline" size={40} color="#FF4444" />
+          <Text style={styles.errorText}>
+            {customerError || loansError || installmentsError || paymentsError}
+          </Text>
+          <TouchableOpacity 
+            style={styles.retryButton} 
+            onPress={() => {
+              fetchCustomerSummary();
+              fetchLoansSummary();
+              fetchInstallmentsSummary();
+              fetchPaymentsSummary();
+            }}
+          >
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.card}>
+      <View style={styles.cardHeader}>
+        <Ionicons name="stats-chart-outline" size={18} color="#2D5BFF" />
+        <Text style={styles.cardTitle}>Summary Statistics</Text>
+      </View>
+
+      {/* Row 1: Total Customers & Total Clients */}
+      <View style={styles.summaryRow}>
+        <View style={[styles.summaryBox, { backgroundColor: '#F5F5F5', borderColor: '#BDBDBD' }]}>
+          <Text style={[styles.summaryValue, { color: '#424242' }]}>
+            {customerSummary?.total_no_of_clients || 0}
+          </Text>
+          <Text style={styles.summaryLabel}>Total Customers</Text>
+        </View>
+        <View style={[styles.summaryBox, { backgroundColor: '#E8F5E9', borderColor: '#00C853' }]}>
+          <Text style={[styles.summaryValue, { color: '#00C853' }]}>
+            {customerSummary?.total_active || 0}
+          </Text>
+          <Text style={styles.summaryLabel}>Total Clients</Text>
+        </View>
+      </View>
+
+      {/* Row 2: Total Loans & Total Installments */}
+      <View style={styles.summaryRow}>
+        <View style={[styles.summaryBox, { backgroundColor: '#E3F2FD', borderColor: '#2D5BFF' }]}>
+          <Text style={[styles.summaryValue, { color: '#2D5BFF' }]}>
+            {loansSummary?.total_no_of_loans || 0}
+          </Text>
+          <Text style={styles.summaryLabel}>Total Loans</Text>
+        </View>
+        <View style={[styles.summaryBox, { backgroundColor: '#FFF9E6', borderColor: '#FFA000' }]}>
+          <Text style={[styles.summaryValue, { color: '#FFA000' }]}>
+            {installmentsSummary?.total_no_of_installments || 0}
+          </Text>
+          <Text style={styles.summaryLabel}>Total Installments</Text>
+        </View>
+      </View>
+
+      {/* Row 3: Total Payments (single box) */}
+      <View style={styles.summaryRow}>
+        <View style={[styles.summaryBox, { backgroundColor: '#E8F5E9', borderColor: '#00C853', flex: 1 }]}>
+          <Text style={[styles.summaryValue, { color: '#00C853' }]}>
+            {paymentsSummary?.total_no_of_payments || 0}
+          </Text>
+          <Text style={styles.summaryLabel}>Total Payments</Text>
+        </View>
+        <View style={{ flex: 1, marginLeft: 8 }} />
+      </View>
+    </View>
+  );
+};
+
 
   return (
     <SafeAreaView style={styles.container}>
@@ -742,8 +1133,18 @@ export default function HomeScreen() {
         {/* Installments Default Rate */}
         {renderIDRCard()}
 
+        {/* Business Unit (BU) - NEW POSITION */}
+        {renderBusinessUnitCard()}
+
+
+        {/* Collections & Disbursements */}
+        {renderCollectionsDisbursementsCards()}
+
+        {/* Summary Statistics - NEW CARD */}
+        {renderStatsSummaryCard()}
+
         {/* Customer Summary - DYNAMIC CARD */}
-        {renderCustomerSummaryCard()}
+        {/* {renderCustomerSummaryCard()} */}
 
         {/* Business Unit */}
         {/* <View style={styles.card}>
@@ -765,7 +1166,7 @@ export default function HomeScreen() {
         </View> */}
 
         {/* Loans Summary */}
-        <View style={styles.card}>
+        {/* <View style={styles.card}>
           <View style={styles.cardHeader}>
             <Ionicons name="repeat-outline" size={18} color="#2D5BFF" />
             <Text style={styles.cardTitle}>Loans Summary</Text>
@@ -787,50 +1188,25 @@ export default function HomeScreen() {
           ) : !loansSummary ? (
             <Text style={styles.noDataText}>No loans data available</Text>
           ) : (
-            <>
-              <View style={styles.loansRow}>
-                <View style={[styles.loanBox, { backgroundColor: '#E3F2FD', borderColor: '#2D5BFF' }]}>
-                  <Text style={[styles.loanValue, { color: '#2D5BFF' }]}>
-                    {loansSummary.total_no_of_loans || 0}
-                  </Text>
-                  <Text style={styles.loanLabel}>Total Loans</Text>
-                </View>
-                <View style={[styles.loanBox, { backgroundColor: '#E8F5E9', borderColor: '#00C853' }]}>
-                  <Text style={[styles.loanValue, { color: '#00C853' }]}>
-                    {loansSummary.total_active || 0}
-                  </Text>
-                  <Text style={styles.loanLabel}>Active Loans</Text>
-                </View>
-              </View>
-
-              <View style={styles.loansRow}>
-                <View style={[styles.loanBox, { backgroundColor: '#FFEBEE', borderColor: '#FF4444' }]}>
-                  <Text style={[styles.loanValue, { color: '#FF4444' }]}>
-                    {loansSummary.total_defaulted || 0}
-                  </Text>
-                  <Text style={styles.loanLabel}>Defaulted</Text>
-                </View>
-                <View style={[styles.loanBox, { backgroundColor: '#FCE4EC', borderColor: '#D81B60' }]}>
-                  <Text style={[styles.loanValue, { color: '#D81B60' }]}>
-                    {loansSummary.total_declined || 0}
-                  </Text>
-                  <Text style={styles.loanLabel}>Declined</Text>
-                </View>
-              </View>
-            </>
+            <View style={[styles.singleStatBox, { borderColor: '#2D5BFF', backgroundColor: '#E3F2FD' }]}>
+              <Text style={[styles.singleStatValue, { color: '#2D5BFF' }]}>
+                {loansSummary.total_no_of_loans || 0}
+              </Text>
+              <Text style={styles.singleStatLabel}>Total Loans</Text>
+            </View>
           )}
-        </View>
+        </View> */}
 
         {/* Installments Summary */}
-        <View style={styles.card}>
+        {/* <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <Ionicons name="calendar-outline" size={18} color="#2D5BFF" />
+            <Ionicons name="calendar-outline" size={18} color="#FFA000" />
             <Text style={styles.cardTitle}>Installments Summary</Text>
           </View>
 
           {installmentsLoading ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#2D5BFF" />
+              <ActivityIndicator size="large" color="#FFA000" />
               <Text style={styles.loadingText}>Loading installments data...</Text>
             </View>
           ) : installmentsError ? (
@@ -844,22 +1220,51 @@ export default function HomeScreen() {
           ) : !installmentsSummary ? (
             <Text style={styles.noDataText}>No installments data available</Text>
           ) : (
-            <View style={styles.installmentsRow}>
-              <View style={[styles.installmentBox, { borderColor: '#FFA000' }]}>
-                <Text style={[styles.installmentValue, { color: '#FFA000' }]}>
-                  {installmentsSummary.total_pending_installments || 0}
-                </Text>
-                <Text style={styles.installmentLabel}>Pending Installments</Text>
-              </View>
-              <View style={[styles.installmentBox, { borderColor: '#FF4444' }]}>
-                <Text style={[styles.installmentValue, { color: '#FF4444' }]}>
-                  {installmentsSummary.total_defaulted_installments || 0}
-                </Text>
-                <Text style={styles.installmentLabel}>Defaulted Installments</Text>
-              </View>
+            <View style={[styles.singleStatBox, { borderColor: '#FFA000', backgroundColor: '#FFF9E6' }]}>
+              <Text style={[styles.singleStatValue, { color: '#FFA000' }]}>
+                {installmentsSummary.total_no_of_installments || 0}
+              </Text>
+              <Text style={styles.singleStatLabel}>Total Installments</Text>
             </View>
           )}
-        </View>
+        </View> */}
+
+        {/* Payments Summary - Single Card */}
+        {/* <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <Ionicons name="cash-outline" size={18} color="#00C853" />
+            <Text style={styles.cardTitle}>Payments</Text>
+          </View>
+
+          {paymentsLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#00C853" />
+              <Text style={styles.loadingText}>Loading payments data...</Text>
+            </View>
+          ) : paymentsError ? (
+            <View style={styles.errorContainer}>
+              <Ionicons name="alert-circle-outline" size={40} color="#FF4444" />
+              <Text style={styles.errorText}>{paymentsError}</Text>
+              <TouchableOpacity style={styles.retryButton} onPress={fetchPaymentsSummary}>
+                <Text style={styles.retryButtonText}>Retry</Text>
+              </TouchableOpacity>
+            </View>
+          ) : !paymentsSummary ? (
+            <Text style={styles.noDataText}>No payments data available</Text>
+          ) : (
+            <View style={[styles.singleStatBox, { borderColor: '#00C853', backgroundColor: '#E8F5E9' }]}>
+              <Text style={[styles.singleStatValue, { color: '#00C853' }]}>
+                {paymentsSummary.total_no_of_payments || 0}
+              </Text>
+              <Text style={styles.singleStatLabel}>Total Payments</Text>
+            </View>
+          )}
+        </View> */}
+
+        {/* Payments Summary - NEW */}
+
+        
+        
 
         {/* Bottom Actions Button */}
         <TouchableOpacity
@@ -1219,4 +1624,177 @@ const styles = StyleSheet.create({
   installmentValue: { fontSize: 26, fontWeight: '700', marginBottom: 4 },
   installmentLabel: { fontSize: 10, color: '#757575', textAlign: 'center' },
   bottomPadding: { height: 20 },
+  paymentsRow: { 
+  flexDirection: 'row', 
+  justifyContent: 'space-between' 
+},
+paymentBox: {
+  flex: 1,
+  alignItems: 'center',
+  paddingVertical: 12,
+  paddingHorizontal: 8,
+  marginHorizontal: 4,
+  borderRadius: 6,
+  borderWidth: 1,
+  borderColor: '#E0E0E0',
+  backgroundColor: '#FAFAFA',
+},
+paymentValue: { 
+  fontSize: 26, 
+  fontWeight: '700', 
+  marginBottom: 4 
+},
+paymentLabel: { 
+  fontSize: 10, 
+  color: '#757575', 
+  textAlign: 'center' 
+},
+paymentLabel: { 
+    fontSize: 10, 
+    color: '#757575', 
+    textAlign: 'center' 
+  },
+  // ADD THESE NEW STYLES BELOW ↓↓↓
+  singleStatBox: {
+    alignItems: 'center',
+    paddingVertical: 20,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 2,
+    marginTop: 4,
+  },
+  singleStatValue: {
+    fontSize: 36,
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  singleStatLabel: {
+    fontSize: 12,
+    color: '#757575',
+    textAlign: 'center',
+  },
+  updatesSection: {
+  paddingHorizontal: 16,
+  marginBottom: 12,
+},
+sectionHeader: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  marginBottom: 16,
+},
+sectionTitle: {
+  fontSize: 16,
+  fontWeight: 'bold',
+  color: '#000000',
+  marginLeft: 8,
+},
+updateCardsContainer: {
+  flexDirection: 'row',
+  gap: 12,
+},
+updateCard: {
+  flex: 1,
+  borderRadius: 16,
+  padding: 16,
+  minHeight: 140,
+  justifyContent: 'space-between',
+},
+updateCardIconContainer: {
+  width: 44,
+  height: 44,
+  borderRadius: 12,
+  justifyContent: 'center',
+  alignItems: 'center',
+  marginBottom: 8,
+},
+updateCardTitle: {
+  fontSize: 13,
+  color: 'white',
+  fontWeight: '500',
+  marginBottom: 8,
+},
+updateCardValue: {
+  fontSize: 18,
+  fontWeight: 'bold',
+  color: 'white',
+  marginBottom: 12,
+},
+updateCardLoader: {
+  marginBottom: 12,
+  alignSelf: 'flex-start',
+},
+updateCardError: {
+  fontSize: 14,
+  color: 'white',
+  marginBottom: 12,
+  opacity: 0.8,
+},
+updateCardFooter: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  paddingVertical: 6,
+  paddingHorizontal: 12,
+  borderRadius: 10,
+  alignSelf: 'flex-start',
+},
+updateCardFooterText: {
+  fontSize: 12,
+  color: 'white',
+  marginLeft: 6,
+  fontWeight: '600',
+},
+filterMenu: {
+  backgroundColor: 'white',
+  borderRadius: 12,
+  marginTop: 12,
+  padding: 8,
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.15,
+  shadowRadius: 8,
+  elevation: 5,
+},
+filterOption: {
+  paddingVertical: 12,
+  paddingHorizontal: 16,
+  borderRadius: 8,
+},
+filterOptionActive: {
+  backgroundColor: '#E3F2FD',
+},
+filterOptionText: {
+  fontSize: 14,
+  color: '#666666',
+  fontWeight: '500',
+},
+filterOptionTextActive: {
+  color: '#2D5BFF',
+  fontWeight: '600',
+},
+summaryRow: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  marginBottom: 12,
+},
+summaryBox: {
+  flex: 1,
+  alignItems: 'center',
+  paddingVertical: 16,
+  paddingHorizontal: 12,
+  marginHorizontal: 4,
+  borderRadius: 8,
+  borderWidth: 1.5,
+},
+summaryValue: {
+  fontSize: 24,
+  fontWeight: '700',
+  marginBottom: 4,
+},
+summaryLabel: {
+  fontSize: 11,
+  color: '#757575',
+  textAlign: 'center',
+  fontWeight: '500',
+},
+  
 });

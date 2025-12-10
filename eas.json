@@ -16,7 +16,7 @@
     "preview": {
       "distribution": "internal",
       "android": {
-        "buildType": "apk"
+        "buildType": "app-bundle"
       },
       "env": {
         "API_BASE_URL": "https://bizwak.co.ke"
@@ -24,7 +24,7 @@
     },
     "production": {
       "android": {
-        "buildType": "apk"
+        "buildType": "app-bundle"
       },
       "env": {
         "API_BASE_URL": "https://bizwak.co.ke"

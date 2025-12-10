@@ -124,18 +124,14 @@ const [activeLoansCount, setActiveLoansCount] = useState(0);
   };
 
   const updateAllocation = (index, field, value) => {
-  console.log('=== UPDATE ALLOCATION ===');
-  console.log('Index:', index);
-  console.log('Field:', field);
-  console.log('Value:', value);
+  
   
   setAllocatedPayments(prev => {
     const updated = prev.map((item, i) => 
       i === index ? { ...item, [field]: value } : item
     );
     
-    console.log('Updated allocation:', updated[index]);
-    console.log('All allocations:', updated);
+    
     
     return updated;
   });
@@ -224,17 +220,24 @@ const [activeLoansCount, setActiveLoansCount] = useState(0);
         return;
       }
 
-      const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+      const response = await fetch(`${API_BASE_URL}/api/users/currentUser`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
       });
 
       const json = await response.json();
-      console.log('Fetched user response:', json); // 👀 See full shape
+      console.log('Fetched user response:', json); 
 
-      if (response.ok && json.status === 'success' && json.data?.user) {
-        setCurrentUser(json.data.user); // ✅ Now sets the real user object
+      // ✅ Match the structure used in fetchCurrentUserForApproval
+      if (response.ok && json.status === 'success' && json.payload && json.payload.length > 0) {
+        const user = json.payload[0];
+        console.log('Setting current user:', user);
+        setCurrentUser(user); 
+      } else if (response.ok && json.data?.user) {
+        // Fallback for alternative response structure
+        console.log('Setting current user (alt structure):', json.data.user);
+        setCurrentUser(json.data.user);
       } else {
         console.warn('Failed to load user:', json);
       }
@@ -472,47 +475,6 @@ const [activeLoansCount, setActiveLoansCount] = useState(0);
   }
 };
 
-//   const fetchLoans = async () => {
-//   try {
-//     setLoadingLoans(true);
-//     const token = await AsyncStorage.getItem('token');
-    
-//     if (!token) {
-//       throw new Error('No token found');
-//     }
-
-//     const response = await fetch(
-//       `${API_BASE_URL}/api/loans/all/${memberId}`,
-//       {
-//         method: 'GET',
-//         headers: {
-//           'Content-Type': 'application/json',
-//           'Authorization': `Bearer ${token}`,
-//         },
-//       }
-//     );
-
-//     if (!response.ok) {
-//       throw new Error(`HTTP error! status: ${response.status}`);
-//     }
-
-//     const data = await response.json();
-//     console.log("Loans payload:", data.payload);
-
-    
-//     if (data.success && data.payload) {
-//       setLoans(data.payload);
-//     } else {
-//       setLoans([]);
-//     }
-    
-//   } catch (err) {
-//     console.error('Error fetching loans:', err);
-//     Alert.alert('Error', `Failed to load loans: ${err.message}`);
-//   } finally {
-//     setLoadingLoans(false);
-//   }
-// };
 
  const fetchLoanLimit = async () => {
   try {
