@@ -247,7 +247,7 @@ const ArrearsReport = () => {
             </Text>
           </View>
           <View style={styles.summaryCard}>
-            <Text style={styles.summaryLabel}>Overdue</Text>
+            <Text style={styles.summaryLabel}>No. of Arrears</Text>
             <Text style={styles.summaryValue}>
               {summary.total_overdue_installments}
             </Text>

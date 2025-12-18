@@ -76,79 +76,169 @@ const LoanManagementForm = ({ navigation, route }) => {
     }
   }, [requestedLoanAmount, formType]);
 
-  const fetchInitialData = async () => {
-    console.log("✅ Fetching initial data for:", clientId);
-    setLoading(true);
-    try {
-      const token = await AsyncStorage.getItem('token');
-      console.log('Token:', token);
-
-      // --- Fetch available credit ---
-      const creditResponse = await axios.get(
-        `${API_BASE_URL}/api/loans/available-credit/${clientId}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      console.log('Credit response:', creditResponse.data);
-
-      if (creditResponse.data.success) {
-        const credit = creditResponse.data.available_credit;
-        setAvailableCredit(credit);
-        setCurrentLoanLimit(credit.toString());
-      }
-
-      // Fetch the client's approved loan limit from client data
-      const clientResponse = await axios.get(
-        `${API_BASE_URL}/api/clients/${clientId}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      if (clientResponse.data.client) {
-        const approvedLimit = clientResponse.data.client.approved_loan_limit || 0;
-        setApprovedLoanLimit(approvedLimit.toLocaleString());
-      }
-
-      // --- Fetch products ---
-      const productsResp = await fetch(`${API_BASE_URL}/api/products/individual`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const productsData = await productsResp.json();
-      console.log('📦 Products data:', productsData);
-
-      if (productsResp.ok) {
-        const formattedProducts = (productsData.payload || []).map((prod) => ({
-          label: prod.name,
-          value: prod.id,
-        }));
-        setProducts(formattedProducts);
-      }
-
-      // --- Fetch BDEs ---
-      const bdesResp = await fetch(`${API_BASE_URL}/api/users`, {
-        headers: { 
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json"
+  // Add this useEffect to handle manual product changes
+  useEffect(() => {
+    if (product && products.length > 0) {
+      const selectedProduct = products.find(p => p.value === product);
+      
+      if (selectedProduct) {
+        const duration = selectedProduct.duration_weeks || selectedProduct.duration_months;
+        if (duration) {
+          setRepaymentDuration(duration.toString());
+          console.log('⏱️ Updated duration for product change:', duration);
         }
-      });
-      const bdesData = await bdesResp.json();
-      console.log('👤 BDEs data:', bdesData);
-
-      if (bdesResp.ok) {
-        const formattedBdes = (bdesData.payload || []).map((bde) => ({
-          label: bde.name,
-          value: bde.id,
-        }));
-        setBdeOptions(formattedBdes);
-      } else {
-        console.warn('❌ Failed to fetch BDEs');
       }
-
-    } catch (error) {
-      console.error('💥 Error fetching initial data:', error);
-      Alert.alert('Error', 'Failed to load form data. Please try again.');
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [product, products]);
+
+  const fetchInitialData = async () => {
+  console.log("✅ Fetching initial data for:", clientId);
+  setLoading(true);
+  try {
+    const token = await AsyncStorage.getItem('token');
+    console.log('Token:', token);
+
+    // --- Fetch client details (includes product_id and requested_amount) ---
+    const clientResponse = await axios.get(
+      `${API_BASE_URL}/api/clients/${clientId}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+
+    let clientProductId = null;
+    let clientRequestedAmount = null;
+
+    if (clientResponse.data.client) {
+      const clientData = clientResponse.data.client;
+      const approvedLimit = clientData.approved_loan_limit || 0;
+      setApprovedLoanLimit(approvedLimit.toLocaleString());
+      
+      // Get product_id from client
+      clientProductId = clientData.product_id;
+      
+      // Get requested_amount from client if available
+      clientRequestedAmount = clientData.requested_amount;
+      
+      console.log('👤 Client product_id:', clientProductId);
+      console.log('💰 Client requested_amount:', clientRequestedAmount);
+    }
+
+    // --- Fetch available credit ---
+    const creditResponse = await axios.get(
+      `${API_BASE_URL}/api/loans/available-credit/${clientId}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    console.log('Credit response:', creditResponse.data);
+
+    if (creditResponse.data.success) {
+      const credit = creditResponse.data.available_credit;
+      setAvailableCredit(credit);
+      setCurrentLoanLimit(credit.toString());
+    }
+
+    // --- Fetch products ---
+    const productsResp = await fetch(`${API_BASE_URL}/api/products/individual`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const productsData = await productsResp.json();
+    console.log('📦 Products data:', productsData);
+
+    if (productsResp.ok) {
+      const formattedProducts = (productsData.payload || []).map((prod) => ({
+        label: prod.name,
+        value: prod.id,
+        duration_weeks: prod.repayment_period || prod.duration_weeks || prod.duration || null, // ✅ Check repayment_period first
+        duration_months: prod.duration_months || null,
+      }));
+      setProducts(formattedProducts);
+
+      // ✅ FIXED: Auto-fill product and duration if client has a product
+      if (clientProductId) {
+        // Find the product first
+        const selectedProduct = formattedProducts.find(p => p.value === clientProductId);
+        
+        if (selectedProduct) {
+          // Set product
+          setProduct(clientProductId);
+          
+          // Set duration immediately after finding the product
+          const duration = selectedProduct.duration_weeks || selectedProduct.duration_months;
+          if (duration) {
+            setRepaymentDuration(duration.toString());
+            console.log('⏱️ Auto-filled duration:', duration);
+          } else {
+            console.warn('⚠️ Product found but has no duration:', selectedProduct);
+          }
+        } else {
+          console.warn('⚠️ Client product_id not found in products list:', clientProductId);
+        }
+      }
+    }
+
+    // --- Fetch loan request details if request_id exists ---
+    if (requestId) {
+      try {
+        const requestResponse = await axios.get(
+          `${API_BASE_URL}/api/loans/requests/${requestId}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        
+        console.log('📋 Loan request data:', requestResponse.data);
+        
+        if (requestResponse.data.success || requestResponse.data.id) {
+          const requestData = requestResponse.data;
+          // Auto-fill requested loan amount from loan request
+          const requestAmount = requestData.amount || requestData.requested_amount;
+          if (requestAmount) {
+            setRequestedLoanAmount(requestAmount.toString());
+            console.log('💵 Auto-filled requested amount from request:', requestAmount);
+          }
+          
+          // Optionally set application date from request
+          if (requestData.created_at) {
+            setApplicationDate(new Date(requestData.created_at));
+          }
+        }
+      } catch (error) {
+        console.error('❌ Error fetching loan request:', error);
+        // Fallback to client's requested_amount if loan request fetch fails
+        if (clientRequestedAmount) {
+          setRequestedLoanAmount(clientRequestedAmount.toString());
+          console.log('💵 Auto-filled requested amount from client:', clientRequestedAmount);
+        }
+      }
+    } else if (clientRequestedAmount) {
+      // If no request_id, use client's requested_amount
+      setRequestedLoanAmount(clientRequestedAmount.toString());
+      console.log('💵 Auto-filled requested amount from client:', clientRequestedAmount);
+    }
+
+    // --- Fetch BDEs ---
+    const bdesResp = await fetch(`${API_BASE_URL}/api/users`, {
+      headers: { 
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json"
+      }
+    });
+    const bdesData = await bdesResp.json();
+    console.log('👤 BDEs data:', bdesData);
+
+    if (bdesResp.ok) {
+      const formattedBdes = (bdesData.payload || []).map((bde) => ({
+        label: bde.name,
+        value: bde.id,
+      }));
+      setBdeOptions(formattedBdes);
+    } else {
+      console.warn('❌ Failed to fetch BDEs');
+    }
+
+  } catch (error) {
+    console.error('💥 Error fetching initial data:', error);
+    Alert.alert('Error', 'Failed to load form data. Please try again.');
+  } finally {
+    setLoading(false);
+  }
+};
 
   const validateLoanAmount = async (amount) => {
     if (!amount || isNaN(amount)) return;
@@ -465,7 +555,7 @@ const LoanManagementForm = ({ navigation, route }) => {
 
           {/* 3. Approved Loan Limit - Now visible with proper styling */}
           <View style={styles.formGroup}>
-            <Text style={styles.label}>Approved Loan Limit (KES)</Text>
+            <Text style={styles.label}>Loan Limit (KES)</Text>
             <View style={styles.creditInfoBox}>
               <Ionicons name="cash-outline" size={24} color="#2196F3" />
               <Text style={styles.creditAmount}>
@@ -500,12 +590,12 @@ const LoanManagementForm = ({ navigation, route }) => {
 
           {/* 6. Repayment Duration */}
           <View style={styles.formGroup}>
-            <Text style={styles.label}>Repayment Duration (weeks) *</Text>
+            <Text style={styles.label}>Repayment Duration</Text>
             <TextInput
               style={[styles.input, !isEditable && styles.inputDisabled]}
               value={repaymentDuration}
               onChangeText={setRepaymentDuration}
-              placeholder="Enter duration in weeks"
+              placeholder="Enter duration"
               keyboardType="numeric"
               editable={isEditable}
             />

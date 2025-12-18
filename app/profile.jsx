@@ -111,7 +111,9 @@ const Profile = () => {
   totalRepayable: 0,
   totalPaid: 0,
   totalBalance: 0,
-  totalDueToday: 0
+  totalDueToday: 0,
+  dailyInstlmntAmnt: 0,
+  arraresToPay: 0
 });
 const [requiredPaymentForTopup, setRequiredPaymentForTopup] = useState(0);
 const [availableCredit, setAvailableCredit] = useState(0);
@@ -170,7 +172,7 @@ const [activeLoanStatus, setActiveLoanStatus] = useState(null);
     if (activeLoan && activeLoanStatus !== null) {
       console.log('🔵 Active loan status:', activeLoanStatus);
       
-      if (activeLoanStatus === 0) return 'Approve Loan (BM)';
+      if (activeLoanStatus === 0) return 'Approve Loan (TL)';
       if (activeLoanStatus === 2) return 'Approve Loan (HQ)';
       if (activeLoanStatus === 3) return 'Disburse Loan';
       
@@ -483,8 +485,6 @@ useEffect(() => {
     const token = await AsyncStorage.getItem('token');
     if (!token) return;
 
-    console.log('🔍 Checking pending request for client:', memberId);
-
     const response = await fetch(
       `${API_BASE_URL}/api/loans/requests/client/${memberId}`,
       {
@@ -499,40 +499,59 @@ useEffect(() => {
     if (response.ok) {
       const data = await response.json();
       
-      //console.log('📦 Full API Response:', JSON.stringify(data, null, 2));
-      
       if (data.success && Array.isArray(data.payload) && data.payload.length > 0) {
-        const request = data.payload[0];
-        console.log('📋 Request:', request);
+        // ✅ FIX: Find the most recent request that hasn't been converted to a loan yet
+        // Sort by created_at descending (newest first)
+        const sortedRequests = [...data.payload].sort((a, b) => {
+          const dateA = new Date(a.created_at);
+          const dateB = new Date(b.created_at);
+          return dateB - dateA; // Newest first
+        });
         
-        const requestStatus = request.status ?? 
-                            request.request_status ?? 
-                            request.approval_status;
+        // Find first request that doesn't have a loan created yet
+        const activeRequest = sortedRequests.find(request => {
+          const hasLoanCreated = request.loan_id != null;
+          return !hasLoanCreated;
+        });
         
-       
-        const hasLoanCreated = request.loan_id != null;
-        
-        if (requestStatus === 0 && !hasLoanCreated) {
+        if (activeRequest) {
+          console.log('📋 Active Request Found:', activeRequest);
           
-          setHasPendingRequest(true);
-          setPendingRequestId(request.id);
-          setHasApprovedRequest(false);
-        } else if (requestStatus === 1 && !hasLoanCreated) {
+          const requestStatus = activeRequest.status ?? 
+                                activeRequest.request_status ?? 
+                                activeRequest.approval_status;
           
-          setHasPendingRequest(false);
-          setHasApprovedRequest(true);
-          setPendingRequestId(request.id);
+          if (requestStatus === 0) {
+            // Pending approval
+            setHasPendingRequest(true);
+            setPendingRequestId(activeRequest.id);
+            setHasApprovedRequest(false);
+            console.log('✅ State: Pending Approval');
+          } else if (requestStatus === 1) {
+            // Approved, ready for loan creation
+            setHasPendingRequest(false);
+            setHasApprovedRequest(true);
+            setPendingRequestId(activeRequest.id);
+            console.log('✅ State: Approved, Ready for Loan Creation');
+          } else {
+            // Some other status (processed, rejected, etc.)
+            setHasPendingRequest(false);
+            setHasApprovedRequest(false);
+            setPendingRequestId(null);
+            console.log('❌ State: No active request (status:', requestStatus, ')');
+          }
         } else {
-          
+          // No requests without loans
           setHasPendingRequest(false);
           setHasApprovedRequest(false);
           setPendingRequestId(null);
+          console.log('❌ No requests found without loans');
         }
       } else {
-        
         setHasPendingRequest(false);
         setHasApprovedRequest(false);
         setPendingRequestId(null);
+        console.log('❌ No requests in payload');
       }
     } else {
       setHasPendingRequest(false);
@@ -540,6 +559,7 @@ useEffect(() => {
       setPendingRequestId(null);
     }
   } catch (err) {
+    console.error('❌ Error checking pending request:', err);
     setHasPendingRequest(false);
     setHasApprovedRequest(false);
     setPendingRequestId(null);
@@ -796,7 +816,9 @@ const fetchLoanSummaryData = async () => {
         totalRepayable: 0,
         totalPaid: 0,
         totalBalance: 0,
-        totalDueToday: 0
+        totalDueToday: 0,
+        dailyInstlmntAmnt: 0,
+        arraresToPay: 0
       });
       setRequiredPaymentForTopup(data.payload.required_payment_for_topup || 0);
       setAvailableCredit(data.payload.available_credit || 0);
@@ -821,8 +843,8 @@ const fetchLoanSummaryData = async () => {
         // This now includes when loan reaches status 4 (disbursed) or higher
         setActiveLoan(null);
         setActiveLoanStatus(null);
-        console.log('❌ No active loan in process (status 0-3) found - cleared state');
-        console.log('📋 Client can now apply for new loan');
+        //console.log('❌ No active loan in process (status 0-3) found - cleared state');
+        //console.log('📋 Client can now apply for new loan');
       }
       
       // ✅ Pass the fresh loan data to checkPendingRequest
@@ -876,8 +898,10 @@ const calculateLoanSummary = () => {
     totalPaid: `Ksh ${(cumulativeTotals.totalPaid || 0).toLocaleString()}`,
     totalBalance: `Ksh ${(cumulativeTotals.totalBalance || 0).toLocaleString()}`,
     balanceDueToday: `${Math.round(cumulativeTotals.totalDueToday || 0).toLocaleString()}`,
-    amntBalForTopup: `Ksh ${Math.round(requiredPaymentForTopup || 0).toLocaleString()}`, // ✅ NEW
-    availableTopUp: `Ksh ${Math.round(availableCredit || 0).toLocaleString()}`, // ✅ UPDATED
+    amntBalForTopup: `Ksh ${Math.round(requiredPaymentForTopup || 0).toLocaleString()}`,
+    availableTopUp: `Ksh ${Math.round(availableCredit || 0).toLocaleString()}`,
+    dailyInstlmntAmnt: `Ksh ${Math.round(cumulativeTotals.dailyInstlmntAmnt || 0).toLocaleString()}`,  // ADD THIS
+    arraresToPay: `Ksh ${Math.round(cumulativeTotals.arraresToPay || 0).toLocaleString()}`              // ADD THIS
   };
 };
   const handleAllocate = async () => {
@@ -2101,6 +2125,26 @@ const handleSubmitAssessment = async () => {
                 <View style={styles.loanRow}>
                   <Text style={styles.loanLabel}>Available Top-Up:</Text>
                   <Text style={styles.loanValue}>{loanSummary.availableTopUp}</Text>
+                </View>
+
+                <View style={styles.loanRow}>
+                  <Text style={styles.loanLabel}>Daily Instlmnt Amnt:</Text>
+                  <Text style={[
+                    styles.loanValue,
+                    loanSummary.dailyInstlmntAmnt !== 'Ksh 0' && { color: '#2196F3', fontWeight: '600' }
+                  ]}>
+                    {loanSummary.dailyInstlmntAmnt}
+                  </Text>
+                </View>
+
+                <View style={styles.loanRow}>
+                  <Text style={styles.loanLabel}>Arrears to Pay:</Text>
+                  <Text style={[
+                    styles.loanValue,
+                    loanSummary.arraresToPay !== 'Ksh 0' && { color: '#F44336', fontWeight: '600' }
+                  ]}>
+                    {loanSummary.arraresToPay}
+                  </Text>
                 </View>
                 
                 {loans.length > 0 ? (
@@ -3348,7 +3392,7 @@ const handleSubmitAssessment = async () => {
                     <Ionicons name="card-outline" size={18} color="#333" />
                     <Text style={styles.detailLabel}>Loan Limit:</Text>
                     <Text style={[styles.detailText, { fontWeight: '600', color: '#666' }]}>
-                      {requestDetails.loanLimit || 'Ksh 0 per product'}
+                      {requestDetails.loanLimit || 'Ksh 0'}
                     </Text>
                   </View>
 

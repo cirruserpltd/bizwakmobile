@@ -42,6 +42,7 @@ const actions = () => {
   //const [disbursementsData, setDisbursementsData] = useState(null);
   const [clientSummary, setClientSummary] = useState(null);
   const [loanSummary, setLoanSummary] = useState(null);
+  const [requestSummary, setRequestSummary] = useState(null);
   
   const [dashboardData, setDashboardData] = useState({
     actions: [
@@ -262,6 +263,41 @@ const actions = () => {
     return null;
   }
 };
+
+const fetchRequestSummary = async (token) => {
+  try {
+    let body = {};
+    
+    // Add filters based on view type
+    if (viewType === 'branch' && selectedView) {
+      body.branch = selectedView.id;
+    } else if (viewType === 'cluster' && selectedView) {
+      body.cluster = selectedView.id;
+    }
+
+    const response = await fetch(`${API_BASE_URL}/api/loans/requests/list/1/1`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      credentials: 'include',
+      body: JSON.stringify(body),
+    });
+
+    const result = await response.json();
+    
+    if (result.success && result.additional_data && result.additional_data.summary) {
+      setRequestSummary(result.additional_data.summary);
+      return result.additional_data.summary;
+    }
+    return null;
+  } catch (err) {
+    console.error('Error fetching request summary:', err);
+    return null;
+  }
+};
+
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
@@ -274,6 +310,7 @@ const actions = () => {
       const [clientSum, loanSum] = await Promise.all([
         fetchClientSummary(token),
         fetchLoanSummary(token),
+        fetchRequestSummary(token),
         //fetchRequestSummary(token)
       ]);
 
@@ -308,8 +345,8 @@ const actions = () => {
       // }
 
       // Update action counts based on client and loan summaries
-      if (clientSum || loanSum) {
-        updateActionCounts(clientSum, loanSum);
+      if (clientSum || loanSum || requestSum) {
+        updateActionCounts(clientSum, loanSum, requestSum); 
       }
 
       // if (!collectionsResult.success || !disbursementsResult.success) {
@@ -325,7 +362,7 @@ const actions = () => {
     }
   };
 
-  const updateActionCounts = (clientSum, loanSum) => {
+  const updateActionCounts = (clientSum, loanSum, requestSum) => {
   
   setDashboardData(prev => ({
     ...prev,
@@ -410,9 +447,12 @@ const actions = () => {
         //   return { ...action, count: applyLoanCount };
         // }
         
-        // case 15: { // Approve Request TL
-        //   return { ...action, count: requestCount };
-        // }
+        case 15: { 
+          return { 
+            ...action, 
+            count: requestSum?.total_pending_approval || 0 
+          };
+        }
         
         default:
           return action;
