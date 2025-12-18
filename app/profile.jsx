@@ -19,6 +19,7 @@ import { router } from 'expo-router';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Picker } from '@react-native-picker/picker';
 import Constants from 'expo-constants';
+import { useFocusEffect } from '@react-navigation/native';
 const { API_BASE_URL } = Constants.expoConfig.extra;
 
 
@@ -115,6 +116,18 @@ const Profile = () => {
 const [requiredPaymentForTopup, setRequiredPaymentForTopup] = useState(0);
 const [availableCredit, setAvailableCredit] = useState(0);
 const [activeLoansCount, setActiveLoansCount] = useState(0);
+const [branches, setBranches] = useState([]);
+const [selectedBranch, setSelectedBranch] = useState('');
+const [showBranchDropdown, setShowBranchDropdown] = useState(false);
+const [hasPendingRequest, setHasPendingRequest] = useState(false);
+const [pendingRequestId, setPendingRequestId] = useState(null);
+const [approveRequestModalVisible, setApproveRequestModalVisible] = useState(false);
+const [requestDetails, setRequestDetails] = useState(null);
+const [loadingRequest, setLoadingRequest] = useState(false);
+const [approvalNotes, setApprovalNotes] = useState('');
+const [hasApprovedRequest, setHasApprovedRequest] = useState(false);
+const [activeLoan, setActiveLoan] = useState(null);
+const [activeLoanStatus, setActiveLoanStatus] = useState(null);
 
 
   
@@ -136,7 +149,6 @@ const [activeLoansCount, setActiveLoansCount] = useState(0);
     return updated;
   });
   
-  // Update totals separately to avoid stale state
   if (field === 'amount') {
     const newAllocations = allocatedPayments.map((item, i) => 
       i === index ? { ...item, amount: value } : item
@@ -151,8 +163,33 @@ const [activeLoansCount, setActiveLoansCount] = useState(0);
   const route = useRoute();
   const memberId = route.params?.memberId; 
 
-  // Function to get button text based on status
  const getButtonText = (status) => {
+  
+  if (status === 'Dormant' || status === 'Active') {
+    
+    if (activeLoan && activeLoanStatus !== null) {
+      console.log('🔵 Active loan status:', activeLoanStatus);
+      
+      if (activeLoanStatus === 0) return 'Approve Loan (BM)';
+      if (activeLoanStatus === 2) return 'Approve Loan (HQ)';
+      if (activeLoanStatus === 3) return 'Disburse Loan';
+      // ✅ REMOVED: Don't return "Apply Loan" here for status 4
+      // The loan is fully disbursed, so it shouldn't be in activeLoan anymore
+    }
+    
+    // ✅ NEW: Check if there are any pending requests
+    if (hasPendingRequest) {
+      return 'Approve Application';
+    }
+    if (hasApprovedRequest) {
+      return 'Create Loan';
+    }
+    
+    // ✅ FIXED: Default action for Dormant/Active with no active loan process
+    return 'Apply Loan';
+  }
+  
+  
   const buttonTextMap = {
     'Pending Allocation': 'Allocate',
     'Pending Assessment': 'Assess',
@@ -160,18 +197,16 @@ const [activeLoansCount, setActiveLoansCount] = useState(0);
     'Pending Onboarding': 'Onboard',
     'Pending BM Approval': 'BM Approval',
     'Pending HQ Approval': 'HQ Approval',
-    'Pending Appraisal': 'Appraise',              // ✅ Added
-    'Pending Appraisal (BM)': 'Approve Appraisal', // ✅ Added
-    'Pending Appraisal (HQ)': 'Approve Appraisal', // ✅ Added
+    'Pending Appraisal': 'Appraise',              
+    'Pending Appraisal (BM)': 'Approve Appraisal',
+    'Pending Appraisal (HQ)': 'Approve Appraisal',
     'Pending RF': 'Receive RF',
-    'Dormant': 'Create Loan',
-    'Active': 'Create Loan',
   };
   return buttonTextMap[status] || status;
 };
 
   // Function to handle status button actions
-  const handleStatusAction =  async () => {
+  const handleStatusAction = async () => {
   if (customer.status === 'Pending Allocation') {
     openAllocateModal();
   } else if (customer.status === 'Pending Assessment') {
@@ -189,27 +224,57 @@ const [activeLoansCount, setActiveLoansCount] = useState(0);
   } else if (customer.status === 'Pending RF') {
     setIsMembershipFeePayment(true);
     setPaymentModalVisible(true);
-  } else if (customer.status === 'Dormant' || customer.status === 'Active') {
-    router.push(`/create_loan?client_id=${memberId}`);
-  } else {
+  } 
+  // ✅ FIXED DORMANT/ACTIVE LOGIC
+  else if (customer.status === 'Dormant' || customer.status === 'Active') {
+    // Priority 1: Handle active loan that needs approval/disbursement (status 0-3)
+    if (activeLoan && activeLoanStatus !== null && activeLoanStatus >= 0 && activeLoanStatus <= 3) {
+      console.log('🎯 Handling loan with status:', activeLoanStatus);
+      // Go to loan details for approval or disbursement
+      router.push(`/loan_details?loan_id=${activeLoan.id}&member_id=${memberId}`);
+      return;
+    }
+    
+    // Priority 2: Handle loan request
+    if (hasPendingRequest) {
+      openApproveRequestModal();
+      return;
+    }
+    
+    if (hasApprovedRequest) {
+      router.push(`/create_loan?client_id=${memberId}`);
+      return;
+    }
+    
+    // Priority 3: Default - apply for loan (no active loan process, no pending request)
+    router.push(`/applyLoan?client_id=${memberId}`);
+  }
+  else {
     Alert.alert('Action', `Perform action for status: ${customer.status}`);
   }
 };
 
-  // Fetch customer profile data
-  useEffect(() => {
+useFocusEffect(
+  React.useCallback(() => {
+    console.log('🔄 Profile screen focused - refreshing data');
     if (memberId) {
       fetchCustomerProfile();
-      //fetchLoans();
-      fetchLoanSummaryData();
-      fetchDisbursements();
-      fetchAllUsers();
-    } else {
-      setError('No member ID provided');
-      setLoading(false);
+      fetchLoanSummaryData(); 
     }
-  }, [memberId]);
+  }, [memberId])
+);
 
+useEffect(() => {
+  if (memberId) {
+    fetchCustomerProfile();
+    fetchLoanSummaryData(); 
+    fetchDisbursements();
+    fetchAllUsers();
+  } else {
+    setError('No member ID provided');
+    setLoading(false);
+  }
+}, [memberId]);
   //fetch current user
   useEffect(() => {
   const fetchCurrentUser = async () => {
@@ -251,7 +316,6 @@ const [activeLoansCount, setActiveLoansCount] = useState(0);
   }
 }, [paymentModalVisible]);
 
-// Reset membership fee flag when modal closes
   useEffect(() => {
     if (!paymentModalVisible) {
       setIsMembershipFeePayment(false);
@@ -261,6 +325,16 @@ const [activeLoansCount, setActiveLoansCount] = useState(0);
       setAllocatedPayments([{ type: '', amount: '' }]);
     }
   }, [paymentModalVisible]);
+
+  useEffect(() => {
+  console.log('=== STATUS UPDATE ===');
+  console.log('Customer Status:', customer?.status);
+  console.log('Has Pending Request:', hasPendingRequest);
+  console.log('Has Approved Request:', hasApprovedRequest);
+  console.log('Active Loan:', activeLoan?.id);
+  console.log('Active Loan Status:', activeLoanStatus);
+  console.log('Button will show:', getButtonText(customer?.status));
+}, [customer?.status, hasPendingRequest, hasApprovedRequest, activeLoan, activeLoanStatus]);
 
 
 
@@ -381,9 +455,9 @@ const [activeLoansCount, setActiveLoansCount] = useState(0);
       }
       
       // Set users for BDE dropdown
-      if (data.users && Array.isArray(data.users)) {
-        setUsers(data.users);
-      }
+      // if (data.users && Array.isArray(data.users)) {
+      //   setUsers(data.users);
+      // }
 
       // Set products if needed
       if (data.products && Array.isArray(data.products)) {
@@ -398,6 +472,89 @@ const [activeLoansCount, setActiveLoansCount] = useState(0);
       setLoading(false);
     }
   };
+
+  const checkPendingRequest = async (existingLoans = null) => {
+  try {
+    const token = await AsyncStorage.getItem('token');
+    if (!token) return;
+
+    console.log('🔍 Checking pending request for client:', memberId);
+
+    const response = await fetch(
+      `${API_BASE_URL}/api/loans/requests/client/${memberId}`,
+      {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      }
+    );
+
+    if (response.ok) {
+      const data = await response.json();
+      
+      console.log('📦 Full API Response:', JSON.stringify(data, null, 2));
+      
+      if (data.success && Array.isArray(data.payload) && data.payload.length > 0) {
+        const request = data.payload[0];
+        console.log('📋 Request:', request);
+        
+        const requestStatus = request.status ?? 
+                            request.request_status ?? 
+                            request.approval_status;
+        
+        console.log('✅ Request Status:', requestStatus);
+        console.log('🆔 Request ID:', request.id);
+        
+        // ✅ Check if request has been used (loan_id exists)
+        const hasLoanCreated = request.loan_id != null;
+        console.log('🏦 Has loan been created from this request?', hasLoanCreated);
+        
+        // ✅ FIXED: Use passed loans or state loans
+        const loansToCheck = existingLoans !== null ? existingLoans : loans;
+        const hasActiveLoan = loansToCheck.some(loan => loan.status === 4);
+        console.log('🔵 Client has active disbursed loan?', hasActiveLoan);
+        console.log('🔵 Total loans to check:', loansToCheck.length);
+        
+        if (requestStatus === 0 && !hasLoanCreated && !hasActiveLoan) {
+          // Pending approval AND no loan created yet AND no active loans
+          console.log('🟡 Setting hasPendingRequest = true');
+          setHasPendingRequest(true);
+          setPendingRequestId(request.id);
+          setHasApprovedRequest(false);
+        } else if (requestStatus === 1 && !hasLoanCreated && !hasActiveLoan) {
+          // Approved BUT no loan created yet AND no active loans
+          console.log('🟢 Setting hasApprovedRequest = true');
+          setHasPendingRequest(false);
+          setHasApprovedRequest(true);
+          setPendingRequestId(request.id);
+        } else {
+          // Request used, has active loan, or other status
+          console.log('⚪ Request has been used, client has active loan, or other status');
+          setHasPendingRequest(false);
+          setHasApprovedRequest(false);
+          setPendingRequestId(null);
+        }
+      } else {
+        console.log('❌ No requests found (empty payload)');
+        setHasPendingRequest(false);
+        setHasApprovedRequest(false);
+        setPendingRequestId(null);
+      }
+    } else {
+      console.log('⚠️ Response not OK:', response.status);
+      setHasPendingRequest(false);
+      setHasApprovedRequest(false);
+      setPendingRequestId(null);
+    }
+  } catch (err) {
+    console.error('❌ Error checking pending request:', err);
+    setHasPendingRequest(false);
+    setHasApprovedRequest(false);
+    setPendingRequestId(null);
+  }
+};
 
   const fetchAllUsers = async () => {
   try {
@@ -644,7 +801,6 @@ const fetchLoanSummaryData = async () => {
     console.log("Loan Summary Data:", data);
 
     if (data.success && data.payload) {
-      // Set all the state from one API call
       setCumulativeTotals(data.payload.cumulative_totals || {
         totalPrincipal: 0,
         totalRepayable: 0,
@@ -655,7 +811,28 @@ const fetchLoanSummaryData = async () => {
       setRequiredPaymentForTopup(data.payload.required_payment_for_topup || 0);
       setAvailableCredit(data.payload.available_credit || 0);
       setActiveLoansCount(data.payload.active_loans_count || 0);
-      setLoans(data.payload.all_loans || []);
+      
+      const allLoans = data.payload.all_loans || [];
+      setLoans(allLoans);
+      
+      // ✅ Check for loans in process (status 0-3)
+      const recentActiveLoan = allLoans.find(loan => 
+        loan.status === 0 || loan.status === 1 || loan.status === 2 || loan.status === 3
+      );
+      
+      if (recentActiveLoan) {
+        setActiveLoan(recentActiveLoan);
+        setActiveLoanStatus(recentActiveLoan.status);
+        console.log('✅ Active loan in process found:', recentActiveLoan);
+        console.log('✅ Active loan status:', recentActiveLoan.status);
+      } else {
+        setActiveLoan(null);
+        setActiveLoanStatus(null);
+        console.log('❌ No active loan in process found - cleared state');
+      }
+      
+      // ✅ FIXED: Pass the fresh loan data to checkPendingRequest
+      await checkPendingRequest(allLoans);
     }
     
   } catch (err) {
@@ -714,20 +891,33 @@ const calculateLoanSummary = () => {
     const token = await AsyncStorage.getItem('token');
     
     console.log('=== ALLOCATION REQUEST ===');
+    console.log('Selected Branch:', selectedBranch);
     console.log('Selected Team Object:', selectedTeam);
     console.log('Selected BDE:', selectedBDE);
+    
+    // ✅ Validate branch is selected
+    if (!selectedBranch) {
+      Alert.alert('Error', 'Please select a branch');
+      return;
+    }
+    
+    // Extract branch ID
+    const branchId = typeof selectedBranch === 'object' && selectedBranch !== null
+      ? selectedBranch.id
+      : selectedBranch;
+    
+    console.log('Resolved Branch ID:', branchId);
     
     // Extract team ID from the stored team object
     const teamId = typeof selectedTeam === 'object' && selectedTeam !== null
       ? selectedTeam.id
-      : selectedTeam; // Fallback if it's just an ID
+      : selectedTeam;
     
     console.log('Resolved Team ID:', teamId);
-    console.log('Team ID type:', typeof teamId);
     
-    // Validate we have proper ID
-    if (!teamId) {
-      Alert.alert('Error', 'Please select a valid team');
+    // Validate we have proper IDs
+    if (!branchId || !teamId) {
+      Alert.alert('Error', 'Please select valid branch and team');
       return;
     }
     
@@ -745,6 +935,7 @@ const calculateLoanSummary = () => {
     
     // Create FormData
     const formData = new FormData();
+    formData.append('branch_id', String(branchId)); // ✅ Add branch
     formData.append('team_id', String(teamId)); 
     
     if (bdeId) {
@@ -787,6 +978,7 @@ const calculateLoanSummary = () => {
     await fetchCustomerProfile();
     
     setModalVisible(false);
+    setSelectedBranch(''); // ✅ Reset branch
     setSelectedTeam('');
     setSelectedBDE('');
     
@@ -838,9 +1030,53 @@ const calculateLoanSummary = () => {
   }
 };
 
+const fetchBranches = async () => {
+  try {
+    const token = await AsyncStorage.getItem('token');
+    if (!token) {
+      throw new Error('No token found');
+    }
+
+    console.log('Fetching branches...'); 
+
+    const response = await fetch(
+      `${API_BASE_URL}/api/branches`,
+      {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log('Branches API Response:', data); 
+    console.log('Branches payload:', data.payload); 
+    
+    if (data.payload) {
+      setBranches(data.payload);
+      console.log('Branches set:', data.payload.length); 
+    } else {
+      setBranches([]);
+      console.log('No branches in payload');
+    }
+    
+  } catch (err) {
+    console.error('Error fetching branches:', err);
+    Alert.alert('Error', `Failed to load branches: ${err.message}`);
+    setBranches([]); 
+  }
+};
+
 
   const openAllocateModal = () => {
     fetchAllUsers();
+    fetchBranches();
     setModalVisible(true);
   };
   const openAssessModal = () => {
@@ -1159,12 +1395,162 @@ const handleHQApproval = async () => {
     
     // ✅ Refresh the customer profile to get the updated status from backend
     await fetchCustomerProfile();
+    await fetchLoanSummaryData();
     
   } catch (err) {
     Alert.alert('Error', `Failed to approve: ${err.message}`);
     console.error('Error with HQ approval:', err);
   } finally {
     setApprovingHQ(false);
+  }
+};
+
+const openApproveRequestModal = async () => {
+  try {
+    setLoadingRequest(true);
+    
+    const token = await AsyncStorage.getItem('token');
+    if (!token) {
+      throw new Error('No token found');
+    }
+
+    // Use the stored request ID
+    if (!pendingRequestId) {
+      throw new Error('No pending request found');
+    }
+
+    // ✅ FIX: Fetch the client's requests again to get the full request object
+    const response = await fetch(
+      `${API_BASE_URL}/api/loans/requests/client/${memberId}`,
+      {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    
+    // ✅ Find the pending request from the array
+    if (data.success && Array.isArray(data.payload) && data.payload.length > 0) {
+      const pendingRequest = data.payload.find(req => req.id === pendingRequestId && req.status === 0);
+      
+      if (pendingRequest) {
+        setRequestDetails(pendingRequest);
+        setApproveRequestModalVisible(true);
+      } else {
+        throw new Error('Pending request not found');
+      }
+    } else {
+      throw new Error('No requests found');
+    }
+    
+  } catch (err) {
+    console.error('Error fetching request details:', err);
+    Alert.alert('Error', `Failed to load request details: ${err.message}`);
+  } finally {
+    setLoadingRequest(false);
+  }
+};
+
+const handleApproveRequest = async () => {
+  try {
+    setLoadingRequest(true);
+    const token = await AsyncStorage.getItem('token');
+    
+    const formData = new FormData();
+    formData.append('request_id', requestDetails.id);
+    if (approvalNotes.trim()) {
+      formData.append('notes', approvalNotes);
+    }
+    
+    const response = await fetch(
+      `${API_BASE_URL}/api/loans/requests/approve`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        body: formData,
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error('Failed to approve request');
+    }
+
+    const result = await response.json();
+    
+    setApproveRequestModalVisible(false);
+    setApprovalNotes('');
+    
+    Alert.alert('Success', 'Loan request approved successfully. You can now create the loan.');
+    
+    // ✅ FIX: Refresh BOTH customer profile AND request status
+    await fetchCustomerProfile();
+    await checkPendingRequest();
+    await fetchLoanSummaryData();
+    
+  } catch (err) {
+    Alert.alert('Error', `Failed to approve request: ${err.message}`);
+    console.error('Error approving request:', err);
+  } finally {
+    setLoadingRequest(false);
+  }
+};
+
+const handleRejectRequest = async () => {
+  try {
+    setLoadingRequest(true);
+    const token = await AsyncStorage.getItem('token');
+    
+    const formData = new FormData();
+    formData.append('request_id', requestDetails.id);
+    if (approvalNotes.trim()) {
+      formData.append('notes', approvalNotes);
+    }
+    
+    const response = await fetch(
+      `${API_BASE_URL}/api/loans/requests/reject`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        body: formData,
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error('Failed to reject request');
+    }
+
+    const result = await response.json();
+    
+    setApproveRequestModalVisible(false);
+    setApprovalNotes('');
+    setHasPendingRequest(false);
+    setPendingRequestId(null);
+    setHasApprovedRequest(false);
+    
+    Alert.alert('Success', 'Loan request rejected. Client can submit a new request.');
+    
+    // Refresh customer profile
+    await fetchCustomerProfile();
+    await checkPendingRequest();
+    await fetchLoanSummaryData();
+    
+  } catch (err) {
+    Alert.alert('Error', `Failed to reject request: ${err.message}`);
+    console.error('Error rejecting request:', err);
+  } finally {
+    setLoadingRequest(false);
   }
 };
 
@@ -1304,6 +1690,7 @@ const handleReceivePayment = async () => {
     
     // ✅ Refresh customer profile to get updated status from backend
     await fetchCustomerProfile();
+    await fetchLoanSummaryData();
     
   } catch (err) {
     Alert.alert('Error', `Failed to process payment: ${err.message}`);
@@ -1493,8 +1880,8 @@ const handleSubmitAssessment = async () => {
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Customer Profile</Text>
           
-          {/* Show both buttons for Active clients */}
-          {customer.status === 'Active' || customer.status === 'Dormant' ? (
+          {/* Show both buttons ONLY for Active clients */}
+          {customer.status === 'Active' ? (
             <View style={styles.dualButtonContainer}>
               <TouchableOpacity 
                 style={styles.receivePaymentButtonSmall}
@@ -1951,12 +2338,65 @@ const handleSubmitAssessment = async () => {
             </View>
 
             <ScrollView style={styles.modalBody}>
+              {/* ✅ Branch Dropdown - NEW */}
+              <Text style={styles.dropdownLabel}>Branch</Text>
+              <TouchableOpacity 
+                style={styles.dropdown}
+                onPress={() => {
+                  setShowBranchDropdown(!showBranchDropdown);
+                  setShowTeamDropdown(false);
+                  setShowBDEDropdown(false);
+                }}
+              >
+                <Text style={styles.dropdownText}>
+                  {selectedBranch 
+                    ? (typeof selectedBranch === 'string' 
+                        ? selectedBranch 
+                        : (selectedBranch.name || 'Select Branch'))
+                    : 'Select Branch'
+                  }
+                </Text>
+                <Ionicons name="chevron-down" size={24} color="#333" />
+              </TouchableOpacity>
+
+              {/* Branch Dropdown List */}
+              {showBranchDropdown && (
+                <View style={styles.dropdownList}>
+                  {branches.length > 0 ? (
+                    branches.map((branch, index) => {
+                      const branchName = typeof branch === 'string' 
+                        ? branch 
+                        : (branch.name || branch.branch_name || 'Unknown Branch');
+                      const branchId = typeof branch === 'string' ? null : branch.id;
+                      
+                      return (
+                        <TouchableOpacity
+                          key={branchId || index}
+                          style={styles.dropdownItem}
+                          onPress={() => {
+                            setSelectedBranch(branch); 
+                            setShowBranchDropdown(false);
+                          }}
+                        >
+                          <Text style={styles.dropdownItemText}>{branchName}</Text>
+                        </TouchableOpacity>
+                      );
+                    })
+                  ) : (
+                    <View style={styles.dropdownItem}>
+                      <Text style={styles.dropdownItemText}>No branches available</Text>
+                    </View>
+                  )}
+                </View>
+              )}
+
               {/* Team Dropdown */}
               <Text style={styles.dropdownLabel}>Team</Text>
               <TouchableOpacity 
                 style={styles.dropdown}
                 onPress={() => {
                   setShowTeamDropdown(!showTeamDropdown);
+                  setShowBranchDropdown(false);
                   setShowBDEDropdown(false);
                 }}
               >
@@ -1976,7 +2416,6 @@ const handleSubmitAssessment = async () => {
                 <View style={styles.dropdownList}>
                   {teams.length > 0 ? (
                     teams.map((team, index) => {
-                      // Handle both string and object formats
                       const teamName = typeof team === 'string' 
                         ? team 
                         : (team.name || team.team_name || 'Unknown Team');
@@ -2003,12 +2442,14 @@ const handleSubmitAssessment = async () => {
                 </View>
               )}
 
+              {/* BDE Dropdown */}
               <Text style={styles.dropdownLabel}>BDE</Text>
               <TouchableOpacity 
                 style={styles.dropdown}
                 onPress={() => {
                   setShowBDEDropdown(!showBDEDropdown);
                   setShowTeamDropdown(false);
+                  setShowBranchDropdown(false);
                 }}
               >
                 <Text style={styles.dropdownText}>
@@ -2018,7 +2459,7 @@ const handleSubmitAssessment = async () => {
               </TouchableOpacity>
 
               {showBDEDropdown && (
-                <View style={styles.dropdownList}>
+                <ScrollView style={[styles.dropdownList, { maxHeight: 250 }]} nestedScrollEnabled={true}>
                   {users.length > 0 ? (
                     users.map((user, index) => {
                       const userName = typeof user === 'string' 
@@ -2027,7 +2468,7 @@ const handleSubmitAssessment = async () => {
                       
                       return (
                         <TouchableOpacity
-                          key={index}
+                          key={user.id || index}
                           style={styles.dropdownItem}
                           onPress={() => {
                             setSelectedBDE(userName);
@@ -2040,19 +2481,19 @@ const handleSubmitAssessment = async () => {
                     })
                   ) : (
                     <View style={styles.dropdownItem}>
-                      <Text style={styles.dropdownItemText}>No BDEs available</Text>
+                      <Text style={styles.dropdownItemText}>Loading users...</Text>
                     </View>
                   )}
-                </View>
+                </ScrollView>
               )}
 
               <TouchableOpacity 
                 style={[
                   styles.modalAllocateButton,
-                  (!selectedTeam || !selectedBDE) && styles.modalAllocateButtonDisabled
+                  (!selectedBranch || !selectedTeam || !selectedBDE) && styles.modalAllocateButtonDisabled
                 ]}
                 onPress={handleAllocate}
-                disabled={!selectedTeam || !selectedBDE}
+                disabled={!selectedBranch || !selectedTeam || !selectedBDE}
               >
                 <Text style={styles.modalAllocateButtonText}>Allocate</Text>
               </TouchableOpacity>
@@ -2822,6 +3263,131 @@ const handleSubmitAssessment = async () => {
                 </TouchableOpacity>
               </View>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Approve Request Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={approveRequestModalVisible}
+        onRequestClose={() => setApproveRequestModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.approveRequestModalContent}>
+            <View style={styles.approveRequestHeader}>
+              <Text style={styles.approveRequestTitle}>
+                Approve Loan Application for {customer?.name}
+              </Text>
+              <TouchableOpacity 
+                onPress={() => setApproveRequestModalVisible(false)}
+                style={styles.closeButton}
+              >
+                <Ionicons name="close" size={24} color="#333" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.approveRequestBody}>
+              <Text style={styles.reviewText}>
+                Review the loan application details before approval.
+              </Text>
+
+              {requestDetails ? (
+                <>
+                  {/* Client Info */}
+                  <View style={styles.detailRow}>
+                    <Ionicons name="person-outline" size={18} color="#333" />
+                    <Text style={styles.detailText}>{customer?.name}</Text>
+                  </View>
+
+                  <View style={styles.detailRow}>
+                    <Ionicons name="call-outline" size={18} color="#333" />
+                    <Text style={styles.detailText}>{customer?.phone}</Text>
+                  </View>
+
+                  <View style={styles.detailSeparator} />
+
+                  {/* Requested Amount */}
+                  <View style={styles.detailRow}>
+                    <Ionicons name="cash-outline" size={18} color="#333" />
+                    <Text style={styles.detailLabel}>Requested Amount:</Text>
+                    <Text style={[styles.detailText, { fontWeight: '700', color: '#4285F4' }]}>
+                      KES {Number(requestDetails.amount || 0).toLocaleString()}
+                    </Text>
+                  </View>
+
+                  {/* Application Date */}
+                  <View style={styles.detailRow}>
+                    <Ionicons name="calendar-outline" size={18} color="#333" />
+                    <Text style={styles.detailLabel}>Application Date:</Text>
+                    <Text style={styles.detailText}>
+                      {requestDetails.created_at 
+                        ? new Date(requestDetails.created_at).toLocaleDateString('en-GB', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })
+                        : 'N/A'}
+                    </Text>
+                  </View>
+
+                  {/* Status */}
+                  <View style={styles.detailRow}>
+                    <Ionicons name="checkmark-circle-outline" size={18} color="#333" />
+                    <Text style={styles.detailLabel}>Status:</Text>
+                    <Text style={styles.detailText}>Pending</Text>
+                  </View>
+
+                  <View style={styles.detailSeparator} />
+
+                  {/* Approval Notes (Optional) */}
+                  <Text style={styles.inputLabel}>Approval Notes (Optional):</Text>
+                  <TextInput
+                    style={[styles.textInput, styles.textArea]}
+                    value={approvalNotes}
+                    onChangeText={setApprovalNotes}
+                    placeholder="Add any notes about this approval..."
+                    multiline
+                    numberOfLines={4}
+                  />
+
+                  {/* Action Buttons */}
+                  <View style={styles.approvalButtonsContainer}>
+                    <TouchableOpacity 
+                      style={styles.rejectButton}
+                      onPress={handleRejectRequest}
+                      disabled={loadingRequest}
+                    >
+                      {loadingRequest ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                      ) : (
+                        <Text style={styles.approvalButtonText}>Reject Application</Text>
+                      )}
+                    </TouchableOpacity>
+
+                    <TouchableOpacity 
+                      style={styles.approveButton}
+                      onPress={handleApproveRequest}
+                      disabled={loadingRequest}
+                    >
+                      {loadingRequest ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                      ) : (
+                        <Text style={styles.approvalButtonText}>Approve Application</Text>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                </>
+              ) : (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color="#4285F4" />
+                  <Text style={styles.loadingText}>Loading request details...</Text>
+                </View>
+              )}
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -4215,6 +4781,32 @@ validationWarningText: {
   color: '#D32F2F',
   flex: 1,
   lineHeight: 16,
+},
+approveRequestModalContent: {
+  backgroundColor: '#fff',
+  borderRadius: 16,
+  width: '90%',
+  maxHeight: '80%',
+  overflow: 'hidden',
+},
+approveRequestHeader: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  paddingHorizontal: 20,
+  paddingVertical: 16,
+  borderBottomWidth: 1,
+  borderBottomColor: '#e0e0e0',
+},
+approveRequestTitle: {
+  fontSize: 18,
+  fontWeight: '600',
+  color: '#333',
+  flex: 1,
+  marginRight: 12,
+},
+approveRequestBody: {
+  padding: 20,
 },
 });
 

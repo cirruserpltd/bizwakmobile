@@ -34,6 +34,9 @@ const LoanDetails = () => {
   const [transactionId, setTransactionId] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [currentUserName, setCurrentUserName] = useState('');
+  const [declineModalVisible, setDeclineModalVisible] = useState(false);
+  const [declineReason, setDeclineReason] = useState('');
+  
 
 
   useEffect(() => {
@@ -331,51 +334,45 @@ const submitDisbursement = async () => {
 };
 
   const handleDecline = () => {
-    if (!loan || !loan.active) return;
-    
-    Alert.prompt(
-      'Decline Loan',
-      'Please provide a reason for declining:',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Decline',
-          style: 'destructive',
-          onPress: async (reason) => {
-            if (!reason || !reason.trim()) {
-              Alert.alert('Error', 'Please provide a reason for declining');
-              return;
-            }
-            
-            try {
-              const token = await AsyncStorage.getItem('token');
-              const response = await fetch(`${API_BASE_URL}/api/loans/reject/${loan.active.id}`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${token}`,
-                },
-                body: JSON.stringify({ reason: reason.trim() }),
-              });
+  if (!loan || !loan.active) return;
+  setDeclineReason('');
+  setDeclineModalVisible(true);
+};
 
-              const data = await response.json();
-              if (data.success) {
-                Alert.alert('Success', data.message, [
-                  { text: 'OK', onPress: () => router.back() }
-                ]);
-              } else {
-                Alert.alert('Error', data.error);
-              }
-            } catch (error) {
-              console.error('Error declining loan:', error);
-              Alert.alert('Error', 'Failed to decline loan');
-            }
-          },
-        },
-      ],
-      'plain-text'
-    );
-  };
+const submitDecline = async () => {
+  if (!declineReason.trim()) {
+    Alert.alert('Error', 'Please provide a reason for declining');
+    return;
+  }
+
+  try {
+    setSubmitting(true);
+    const token = await AsyncStorage.getItem('token');
+    const response = await fetch(`${API_BASE_URL}/api/loans/reject/${loan.active.id}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ reason: declineReason.trim() }),
+    });
+
+    const data = await response.json();
+    if (data.success) {
+      Alert.alert('Success', data.message, [
+        { text: 'OK', onPress: () => router.back() }
+      ]);
+      setDeclineModalVisible(false);
+    } else {
+      Alert.alert('Error', data.error);
+    }
+  } catch (error) {
+    console.error('Error declining loan:', error);
+    Alert.alert('Error', 'Failed to decline loan');
+  } finally {
+    setSubmitting(false);
+  }
+};
 
   if (loading) {
     return (
@@ -754,7 +751,7 @@ const submitDisbursement = async () => {
 
             {/* Approval Comment */}
             <View style={styles.formGroup}>
-              <Text style={styles.approvalCommentLabel}>Enter approval comment(Optional).</Text>
+              <Text style={styles.approvalCommentLabel}>Enter approval comment.</Text>
               <TextInput
                 style={styles.approvalCommentInput}
                 placeholder="Enter approval comments"
@@ -896,6 +893,81 @@ const submitDisbursement = async () => {
           </View>
         </View>
       </Modal>
+      {/* Decline Modal */}
+{/* Decline Modal */}
+<Modal
+  visible={declineModalVisible}
+  transparent
+  animationType="fade"
+  onRequestClose={() => !submitting && setDeclineModalVisible(false)}
+>
+  <View style={styles.modalOverlay}>
+    <View style={styles.modalContent}>
+      <Text style={styles.modalTitle}>Decline this loan?</Text>
+      <Text style={styles.modalSubtitle}>
+        Please provide a reason for declining this loan application.
+      </Text>
+      
+      {/* Loan Details */}
+      <View style={styles.disbursementDetails}>
+        <View style={styles.disbursementRow}>
+          <View style={styles.disbursementCol}>
+            <Text style={styles.disbursementLabel}>Client's name</Text>
+            <Text style={styles.disbursementValue}>
+              {activeLoan.client_name || 'N/A'}
+            </Text>
+          </View>
+          <View style={styles.disbursementCol}>
+            <Text style={styles.disbursementLabel}>Loan amount</Text>
+            <Text style={styles.disbursementValue}>
+              Kes {parseFloat(activeLoan.amount || 0).toLocaleString('en-US', { 
+                minimumFractionDigits: 1 
+              })}
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Decline Reason Input */}
+      <View style={styles.formGroup}>
+        <Text style={styles.formLabel}>Reason for declining (Optional)</Text>
+        <TextInput
+          style={[styles.approvalCommentInput, { minHeight: 100 }]}
+          placeholder="Enter reason for declining this loan..."
+          placeholderTextColor="#9E9E9E"
+          multiline
+          numberOfLines={5}
+          value={declineReason}
+          onChangeText={setDeclineReason}
+          textAlignVertical="top"
+          editable={!submitting}
+        />
+      </View>
+
+      {/* Buttons */}
+      <View style={styles.modalButtons}>
+        <TouchableOpacity
+          style={[styles.modalCancelButton, submitting && styles.buttonDisabled]}
+          onPress={() => setDeclineModalVisible(false)}
+          disabled={submitting}
+        >
+          <Text style={styles.modalCancelButtonText}>Cancel</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.modalDeclineButton, submitting && styles.buttonDisabled]}
+          onPress={submitDecline}
+          disabled={submitting}
+        >
+          {submitting ? (
+            <ActivityIndicator color="#fff" size="small" />
+          ) : (
+            <Text style={styles.modalDeclineButtonText}>Decline Loan</Text>
+          )}
+        </TouchableOpacity>
+      </View>
+    </View>
+  </View>
+</Modal>
 
       {/* Date Picker for iOS/Android */}
       {showDatePicker && (
@@ -1494,6 +1566,20 @@ const styles = StyleSheet.create({
   datePickerDone: {
     color: '#4CAF50',
   },
+  modalDeclineButton: {
+  flex: 1,
+  backgroundColor: '#F44336',
+  paddingVertical: 14,
+  borderRadius: 8,
+  alignItems: 'center',
+  elevation: 2,
+},
+modalDeclineButtonText: {
+  color: '#fff',
+  fontSize: 14,
+  fontWeight: '600',
+  letterSpacing: 0.5,
+},
 });
 
 export default LoanDetails;

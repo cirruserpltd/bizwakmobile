@@ -44,10 +44,6 @@ const actions = () => {
   const [loanSummary, setLoanSummary] = useState(null);
   
   const [dashboardData, setDashboardData] = useState({
-    // updates: {
-    //   collections: 0,
-    //   disbursements: 0,
-    // },
     actions: [
       { id: 1, label: 'Add a new Customer', icon: 'person-add', color: '#D1F4F7', iconColor: '#00BCD4', borderColor: '#00BCD4', route: '/newlead' },
       { id: 2, label: 'Allocate Customer', icon: 'sync', color: '#D1F4F7', iconColor: '#00BCD4', borderColor: '#00BCD4', count: 0, route: '/client_summary' },
@@ -57,6 +53,8 @@ const actions = () => {
       { id: 6, label: 'Approve Onboard TL', icon: 'checkmark-circle', color: '#E8F5E9', iconColor: '#388E3C', borderColor: '#4CAF50', count: 0, route: 'ApproveOnboardTL' },
       { id: 7, label: 'Approve Onboard HQ', icon: 'checkmark-circle', color: '#E8F5E9', iconColor: '#388E3C', borderColor: '#4CAF50', count: 0, route: 'ApproveOnboardHQ' },
       { id: 13, label: 'Pay RF', icon: 'document-attach', color: '#FFF9E6', iconColor: '#F57C00', borderColor: '#F57C00', count: 0, route: '/client_summary' },
+      { id: 14, label: 'Apply Loan', icon: 'cash', color: '#D1F4F7', iconColor: '#00BCD4', borderColor: '#00BCD4', route: '/client_summary' },
+      { id: 15, label: 'Approve Loan Request TL', icon: 'checkmark-done', color: '#FFF9E6', iconColor: '#F57C00', borderColor: '#F57C00', count: 0, route: '/requestReport' },
       //{ id: 8, label: 'Apply Loan/ Top Up', icon: 'hand-left', color: '#D1F4F7', iconColor: '#00BCD4', borderColor: '#00BCD4', route: 'ApplyLoan' },
       { id: 9, label: 'Create Loan/Top Up', icon: 'hand-left', color: '#D1F4F7', iconColor: '#00BCD4', borderColor: '#2196F3', route: '/create_loan' },
       { id: 10, label: 'Approve Loan TL', icon: 'document-text', color: '#FFF9E6', iconColor: '#F57C00', borderColor: '#F57C00', subtitle: 'Ksh 0', count: 0, route: '/loan_summary' },
@@ -65,30 +63,18 @@ const actions = () => {
     ],
   });
 
-  // const ACTION_STATUS_MAP = {
-  //   2: { status: 0, label: 'Pending Allocation', type: 'client' },
-  //   3: { status: 1, label: 'Pending Assessment', type: 'client' },
-  //   4: { status: 2, label: 'Pending Approval', type: 'client' },
-  //   5: { status: 3, label: 'Pending Onboarding', type: 'client' },
-  //   6: { status: 4, label: 'Pending BM Approval', type: 'client' },
-  //   7: { status: 5, label: 'Pending HQ Approval', type: 'client' },
-  //   13: { status: 'pending_rf', label: 'Pending RF', type: 'client' },
-  //   8: { status: 10, label: 'Dormant', type: 'client' },           
-  //   9: { status: 10, label: 'Dormant', type: 'client' },          
-  //   10: { status: 0, label: 'Pending BM Approval', type: 'loan' },
-  //   11: { status: 2, label: 'Pending HQ Approval', type: 'loan' },
-  //   12: { status: 3, label: 'Pending Disbursement', type: 'loan' },
-  // };
   const ACTION_STATUS_MAP = {
-    2: { status: 0, label: 'Pending Allocation', type: 'client' },  // Verify this status value
+    2: { status: 0, label: 'Pending Allocation', type: 'client' },  
     3: { status: 1, label: 'Pending Assessment', type: 'client' },
     4: { status: 2, label: 'Pending Approval', type: 'client' },
     5: { status: 3, label: 'Pending Onboarding', type: 'client' },
     6: { status: 4, label: 'Pending BM Approval', type: 'client' },
     7: { status: 5, label: 'Pending HQ Approval', type: 'client' },
     13: { status: 'pending_rf', label: 'Pending RF', type: 'client' },
+    //14: { status: 10, label: 'Dormant', type: 'client' }, 
+    15: { status: 0, label: 'Pending Approval Request', type: 'request' }, 
     // ID 8 removed - not in your actions array
-    9: { status: 10, label: 'Dormant', type: 'client' },  // Changed to use status filter
+    9: { status: 10, label: 'Dormant', type: 'client' }, 
     10: { status: 0, label: 'Pending BM Approval', type: 'loan' },
     11: { status: 2, label: 'Pending HQ Approval', type: 'loan' },
     12: { status: 3, label: 'Pending Disbursement', type: 'loan' },
@@ -283,18 +269,12 @@ const actions = () => {
 
       const token = await AsyncStorage.getItem("token");
 
-      // // Build query params for collections and disbursements
-      // let queryParams = `period=${dateFilter}`;
-      // if (viewType === 'branch' && selectedView) {
-      //   queryParams += `&branch_id=${selectedView.id}`;
-      // } else if (viewType === 'cluster' && selectedView) {
-      //   queryParams += `&cluster_id=${selectedView.id}`;
-      // }
 
       // Fetch all data in parallel
       const [clientSum, loanSum] = await Promise.all([
         fetchClientSummary(token),
-        fetchLoanSummary(token)
+        fetchLoanSummary(token),
+        //fetchRequestSummary(token)
       ]);
 
       // const collectionsResult = await collectionsResponse.json();
@@ -424,6 +404,15 @@ const actions = () => {
             subtitle: `Ksh ${formatNumber(amount)}`
           };
         }
+
+        // case 14: { // Apply Loan
+        //   const applyLoanCount = (clientSum?.total_dormant || 0) + (clientSum?.total_active || 0);
+        //   return { ...action, count: applyLoanCount };
+        // }
+        
+        // case 15: { // Approve Request TL
+        //   return { ...action, count: requestCount };
+        // }
         
         default:
           return action;
@@ -482,6 +471,11 @@ const actions = () => {
         router.push('/newlead');
         return;
       }
+
+      if (action.id === 15) {
+        router.push('/requestReport');
+        return;
+      }
     const actionConfig = ACTION_STATUS_MAP[action.id];
     
      if (!actionConfig) {
@@ -510,6 +504,9 @@ const actions = () => {
         }
       });
     }
+    else if (actionConfig.type === 'request') {
+      router.push('/requestReport');
+    }
   };
 
   const handleProfilePress = () => {
@@ -523,33 +520,38 @@ const actions = () => {
     }
   };
 
-  // const renderUpdateCard = (title, value, color, icon, isLoading) => (
-  //   <View style={[styles.updateCard, { backgroundColor: color }]}>
-  //     <View style={[styles.updateCardIconContainer, { backgroundColor: color === '#4CAF50' ? '#66BB6A' : '#42A5F5' }]}>
-  //       <Ionicons name={icon} size={22} color="white" />
-  //     </View>
-  //     <Text style={styles.updateCardTitle}>{title}</Text>
-      
-  //     {isLoading ? (
-  //       <ActivityIndicator size="small" color="white" style={styles.updateCardLoader} />
-  //     ) : error ? (
-  //       <Text style={styles.updateCardError}>Error</Text>
-  //     ) : (
-  //       <Text style={styles.updateCardValue}>{formatNumber(value)}</Text>
-  //     )}
-      
-  //     <TouchableOpacity 
-  //       style={[styles.updateCardFooter, { backgroundColor: color === '#4CAF50' ? '#66BB6A' : '#42A5F5' }]}
-  //       onPress={() => setShowFilterMenu(!showFilterMenu)}
-  //       activeOpacity={0.7}
-  //     >
-  //       <Ionicons name="calendar" size={14} color="white" />
-  //       <Text style={styles.updateCardFooterText}>{getFilterLabel()}</Text>
-  //       <Ionicons name="chevron-down" size={14} color="white" style={{ marginLeft: 4 }} />
-  //     </TouchableOpacity>
-  //   </View>
-  // );
+//  const fetchRequestSummary = async (token) => {
+//   try {
+//     let body = {};
+    
+//     if (viewType === 'branch' && selectedView) {
+//       body.branch_id = selectedView.id;
+//     } else if (viewType === 'cluster' && selectedView) {
+//       body.cluster_id = selectedView.id;
+//     }
 
+//     // Adjust this endpoint to match your API
+//     const response = await fetch(`${API_BASE_URL}/api/requests/pending-tl`, {
+//       method: 'POST',
+//       headers: {
+//         'Content-Type': 'application/json',
+//         'Authorization': `Bearer ${token}`,
+//       },
+//       credentials: 'include',
+//       body: JSON.stringify(body),
+//     });
+
+//     const result = await response.json();
+    
+//     if (result.success) {
+//       return result.count || 0; // Adjust based on your API response structure
+//     }
+//     return 0;
+//   } catch (err) {
+//     console.error('Error fetching request summary:', err);
+//     return 0;
+//   }
+// };
   const renderActionItem = (action) => (
     <TouchableOpacity
       key={action.id}
@@ -566,10 +568,10 @@ const actions = () => {
         </View>
         <View style={styles.actionTextContainer}>
           <Text style={[styles.actionLabel, { 
-            color: action.id === 3 || action.id === 10 || action.id === 11 ? '#E65100' :
-                   action.id === 4 ? '#C62828' :
-                   action.id === 6 || action.id === 7 ? '#2E7D32' :
-                   '#0277BD'
+            color: action.id === 3 || action.id === 10 || action.id === 11 || action.id === 13 || action.id === 15 ? '#E65100' :
+                  action.id === 4 ? '#C62828' :
+                  action.id === 6 || action.id === 7 ? '#2E7D32' :
+                  '#0277BD'
           }]}>{action.label}</Text>
           {action.subtitle && (
             <Text style={styles.actionSubtitle}>{action.subtitle}</Text>
@@ -577,16 +579,16 @@ const actions = () => {
         </View>
         {action.count !== undefined && (
           <View style={[styles.actionBadge, { 
-            backgroundColor: action.id === 3 || action.id === 10 || action.id === 11 ? '#FFE0B2' :
-                           action.id === 4 ? '#FFCDD2' :
-                           action.id === 6 || action.id === 7 ? '#C8E6C9' :
-                           '#B3E5FC'
+            backgroundColor: action.id === 3 || action.id === 10 || action.id === 11 || action.id === 13 || action.id === 15 ? '#FFE0B2' :
+                          action.id === 4 ? '#FFCDD2' :
+                          action.id === 6 || action.id === 7 ? '#C8E6C9' :
+                          '#B3E5FC'
           }]}>
             <Text style={[styles.actionBadgeText, {
-              color: action.id === 3 || action.id === 10 || action.id === 11 ? '#E65100' :
-                     action.id === 4 ? '#C62828' :
-                     action.id === 6 || action.id === 7 ? '#2E7D32' :
-                     '#0277BD'
+              color: action.id === 3 || action.id === 10 || action.id === 11 || action.id === 13 || action.id === 15 ? '#E65100' :
+                    action.id === 4 ? '#C62828' :
+                    action.id === 6 || action.id === 7 ? '#2E7D32' :
+                    '#0277BD'
             }]}>{loading ? '...' : action.count}</Text>
           </View>
         )}
@@ -722,35 +724,37 @@ const actions = () => {
           />
         }
       >
-        {/* Date Section */}
-        <View style={styles.dateSection}>
-          <View style={styles.dateLeft}>
-            <Text style={styles.dateLabel}>Date</Text>
-            <Text style={styles.dateValue}>{formatDate(currentDate)}</Text>
-            
-            <View>
-              <Text style={styles.switchViewLabel}>Switch View</Text>
-              <TouchableOpacity 
-                style={styles.currentViewBox}
-                onPress={handleViewButtonPress}
-                activeOpacity={0.7}
-              >
-                <View style={styles.currentViewContent}>
-                  <Ionicons 
-                    name={viewType === 'cluster' ? 'people' : viewType === 'branch' ? 'location' : 'business'} 
-                    size={16} 
-                    color="#2196F3" 
-                    style={styles.currentViewIcon}
-                  />
-                  <View style={styles.currentViewTextContainer}>
-                    <Text style={styles.currentViewLabel}>Current View:</Text>
-                    <Text style={styles.currentViewValue}>{getViewLabel()}</Text>
-                  </View>
-                  <Ionicons name="chevron-down" size={16} color="#2196F3" />
+      {/* Date Section */}
+      <View style={styles.dateSection}>
+        <View style={styles.dateLeft}>
+          <Text style={styles.dateLabel}>Date</Text>
+          <Text style={styles.dateValue}>{formatDate(currentDate)}</Text>
+          
+          <View>
+            <Text style={styles.switchViewLabel}>Switch View</Text>
+            <TouchableOpacity 
+              style={styles.currentViewBox}
+              onPress={handleViewButtonPress}
+              activeOpacity={0.7}
+            >
+              <View style={styles.currentViewContent}>
+                <Ionicons 
+                  name={viewType === 'cluster' ? 'people' : viewType === 'branch' ? 'location' : 'business'} 
+                  size={16} 
+                  color="#2196F3" 
+                  style={styles.currentViewIcon}
+                />
+                <View style={styles.currentViewTextContainer}>
+                  <Text style={styles.currentViewLabel}>Current View:</Text>
+                  <Text style={styles.currentViewValue}>{getViewLabel()}</Text>
                 </View>
-              </TouchableOpacity>
-            </View>
+                <Ionicons name="chevron-down" size={16} color="#2196F3" />
+              </View>
+            </TouchableOpacity>
           </View>
+        </View>
+        
+        <View style={styles.dateRight}>
           <TouchableOpacity 
             style={styles.profileButton}
             onPress={handleProfilePress}
@@ -758,7 +762,17 @@ const actions = () => {
           >
             <Ionicons name="person" size={28} color="white" />
           </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.arrearsButton}
+            onPress={() => router.push('/arrearsReport')}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="warning" size={18} color="#FF6B6B" />
+            <Text style={styles.arrearsButtonText}>Arrears</Text>
+          </TouchableOpacity>
         </View>
+      </View>
 
         {/* Updates Section */}
         {/* <View style={styles.updatesSection}>
@@ -858,6 +872,10 @@ const styles = StyleSheet.create({
   dateLeft: {
     flex: 1,
   },
+  dateRight: {
+    alignItems: 'flex-end',
+    gap: 10,
+  },
   dateLabel: {
     fontSize: 18,
     fontWeight: 'bold',
@@ -868,6 +886,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666666',
     marginBottom: 12,
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  switchViewContainer: {
+    flex: 1,
   },
   switchViewLabel: {
     fontSize: 12,
@@ -1149,5 +1175,24 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: 'bold',
   },
+  arrearsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFE5E5',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FF6B6B',
+    marginTop: 18, 
+    marginLeft: 'auto',
+  },
+  arrearsButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FF6B6B',
+    marginLeft: 6,
+  },
+  
 });
 export default actions;

@@ -75,13 +75,23 @@ export default function HomeScreen() {
   useEffect(() => {
     fetchIDRData();
     fetchCashBalance();
-    fetchCollections();          
-    fetchDisbursements();        
     fetchCustomerSummary();
     fetchLoansSummary();
     fetchInstallmentsSummary();
     fetchPaymentsSummary();
+  }, []);
+
+  useEffect(() => {
+    fetchCollections();          
+    fetchDisbursements();
   }, [viewType, selectedView, dateFilter]);
+
+  useEffect(() => {
+    console.log('Current dateFilter:', dateFilter);
+    console.log('Current viewType:', viewType);
+    console.log('Current selectedView:', selectedView);
+  }, [dateFilter, viewType, selectedView]);
+
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -255,7 +265,6 @@ export default function HomeScreen() {
 
       let body = {};
       
-      // Add filters based on view type
       if (viewType === 'branch' && selectedView) {
         body.branch = selectedView.id;
       } else if (viewType === 'cluster' && selectedView) {
@@ -302,7 +311,6 @@ export default function HomeScreen() {
 
     const token = await AsyncStorage.getItem("token");
 
-    // CHANGED: Use query params instead of body
     let queryParams = '';
     if (viewType === 'branch' && selectedView) {
       queryParams = `?branch=${selectedView.id}`;
@@ -310,7 +318,6 @@ export default function HomeScreen() {
       queryParams = `?cluster=${selectedView.id}`;
     }
 
-    // CHANGED: GET method with query params
     const response = await fetch(`${API_BASE_URL}/api/loans/getpaginatedinstallments/1/1${queryParams}`, {
       method: 'GET',
       headers: {
@@ -397,7 +404,6 @@ const fetchPaymentsSummary = async () => {
       queryParams = `?cluster=${selectedView.id}`;
     }
 
-    // CHANGED: GET method with query params
     const response = await fetch(`${API_BASE_URL}/api/loans/getpaginatedpayments/1/1${queryParams}`, {
       method: 'GET',
       headers: {
@@ -437,12 +443,16 @@ const fetchCollections = async () => {
 
     const token = await AsyncStorage.getItem("token");
 
-    let queryParams = `period=${dateFilter}`;
+    const period = dateFilter || 'mtd';
+    let queryParams = `period=${period}`;
+    
     if (viewType === 'branch' && selectedView) {
       queryParams += `&branch_id=${selectedView.id}`;
     } else if (viewType === 'cluster' && selectedView) {
       queryParams += `&cluster_id=${selectedView.id}`;
     }
+
+    console.log('Fetching collections with params:', queryParams); 
 
     const response = await fetch(`${API_BASE_URL}/api/collections?${queryParams}`, {
       method: 'GET',
@@ -460,6 +470,7 @@ const fetchCollections = async () => {
     }
 
     const result = await response.json();
+    console.log('Collections result:', result); 
 
     if (result.success && result.payload) {
       setCollectionsData(result.payload);
@@ -481,12 +492,16 @@ const fetchDisbursements = async () => {
 
     const token = await AsyncStorage.getItem("token");
 
-    let queryParams = `period=${dateFilter}`;
+    const period = dateFilter || 'mtd';
+    let queryParams = `period=${period}`;
+    
     if (viewType === 'branch' && selectedView) {
       queryParams += `&branch_id=${selectedView.id}`;
     } else if (viewType === 'cluster' && selectedView) {
       queryParams += `&cluster_id=${selectedView.id}`;
     }
+
+    console.log('Fetching disbursements with params:', queryParams); 
 
     const response = await fetch(`${API_BASE_URL}/api/disbursements?${queryParams}`, {
       method: 'GET',
@@ -504,6 +519,7 @@ const fetchDisbursements = async () => {
     }
 
     const result = await response.json();
+    console.log('Disbursements result:', result); 
 
     if (result.success && result.payload) {
       setDisbursementsData(result.payload);
