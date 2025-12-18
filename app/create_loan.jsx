@@ -23,8 +23,12 @@ const { API_BASE_URL } = Constants.expoConfig.extra;
 
 const LoanManagementForm = ({ navigation, route }) => {
   const router = useRouter();
-  const { client_id } = useLocalSearchParams(); 
-  const clientId = client_id;  
+  const { client_id, request_id } = useLocalSearchParams(); // ✅ Added request_id
+  const clientId = client_id;
+  const requestId = request_id; // ✅ Store request_id
+
+  console.log("🧭 route param client_id:", client_id);
+  console.log("🎫 route param request_id:", request_id); // ✅ Log it
   
   // Form type state
   const [formType, setFormType] = useState('loan'); 
@@ -258,6 +262,11 @@ const LoanManagementForm = ({ navigation, route }) => {
               formData.append('product', product);
               formData.append('bdo_individual_loan_approval_id', bde);
               if (creationNotes) formData.append('creation_notes', creationNotes);
+
+              if (requestId) {
+                formData.append('loan_request_id', requestId);
+                console.log('✅ Including loan_request_id:', requestId);
+              }
 
               const response = await axios.post(
                 `${API_BASE_URL}/api/loans/createnewindividualloans/${clientId}`,

@@ -9,6 +9,7 @@ import {
   Platform,
   SafeAreaView,
   Image,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -20,8 +21,32 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [fadeAnim] = useState(new Animated.Value(0));
 
+  const showToast = (message) => {
+    setToastMessage(message);
+    setToastVisible(true);
+    
+    // Fade in
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
 
+    // Fade out and hide after 2 seconds
+    setTimeout(() => {
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start(() => {
+        setToastVisible(false);
+      });
+    }, 2000);
+  };
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -55,13 +80,16 @@ export default function LoginScreen() {
 
         if (userId) {
           await AsyncStorage.setItem("userId", userId);
-          //console.log("User ID saved:", userId);
         } else {
           console.warn("No userId received from the server!");
         }
 
-        alert("Login successful!");
-        router.push("/home");
+        showToast("Login successful!");
+        
+        // Navigate after a short delay to show the toast
+        setTimeout(() => {
+          router.push("/home");
+        }, 1000);
       } else {
         console.log("Login failed:", data);
         alert(data.message || "Login failed");
@@ -71,6 +99,7 @@ export default function LoginScreen() {
       alert("Could not connect to the server");
     }
   };
+
   const handleForgotPassword = () => {
     console.log('Forgot password pressed');
     // Add your forgot password logic here
@@ -83,6 +112,14 @@ export default function LoginScreen() {
         style={styles.keyboardView}
       >
         <View style={styles.content}>
+          {/* Toast Notification */}
+          {toastVisible && (
+            <Animated.View style={[styles.toast, { opacity: fadeAnim }]}>
+              <Ionicons name="checkmark-circle" size={20} color="#fff" />
+              <Text style={styles.toastText}>{toastMessage}</Text>
+            </Animated.View>
+          )}
+
           {/* User Icon */}
           <Image 
             source={require('../assets/icon.png')}  
@@ -168,16 +205,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  // iconContainer: {
-  //   width: 100,
-  //   height: 100,
-  //   borderRadius: 50,
-  //   backgroundColor: '#4A5FFF',
-  //   justifyContent: 'center',
-  //   alignItems: 'center',
-  //   marginBottom: 20,
-  //   overflow: 'hidden',  
-  // },
   logoImage: {
     width: 120,    
     height: 120,   
@@ -241,5 +268,32 @@ const styles = StyleSheet.create({
     color: '#a0a0c0',
     fontSize: 14,
     textDecorationLine: 'underline',
+  },
+  toast: {
+    position: 'absolute',
+    top: 50,
+    left: 30,
+    right: 30,
+    backgroundColor: '#4CAF50',
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    zIndex: 1000,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  toastText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '500',
+    marginLeft: 10,
   },
 });

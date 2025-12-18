@@ -173,19 +173,19 @@ const [activeLoanStatus, setActiveLoanStatus] = useState(null);
       if (activeLoanStatus === 0) return 'Approve Loan (BM)';
       if (activeLoanStatus === 2) return 'Approve Loan (HQ)';
       if (activeLoanStatus === 3) return 'Disburse Loan';
-      // ✅ REMOVED: Don't return "Apply Loan" here for status 4
-      // The loan is fully disbursed, so it shouldn't be in activeLoan anymore
+      
     }
     
-    // ✅ NEW: Check if there are any pending requests
+    
     if (hasPendingRequest) {
       return 'Approve Application';
     }
     if (hasApprovedRequest) {
       return 'Create Loan';
     }
-    
-    // ✅ FIXED: Default action for Dormant/Active with no active loan process
+    else {
+      return 'Apply Loan';
+    }
     return 'Apply Loan';
   }
   
@@ -225,12 +225,12 @@ const [activeLoanStatus, setActiveLoanStatus] = useState(null);
     setIsMembershipFeePayment(true);
     setPaymentModalVisible(true);
   } 
-  // ✅ FIXED DORMANT/ACTIVE LOGIC
+  // ✅ FIXED: Handle Dormant/Active status
   else if (customer.status === 'Dormant' || customer.status === 'Active') {
-    // Priority 1: Handle active loan that needs approval/disbursement (status 0-3)
+    // Priority 1: Handle loan in process (status 0-3 only)
+    // ✅ Changed condition to explicitly check status 0-3
     if (activeLoan && activeLoanStatus !== null && activeLoanStatus >= 0 && activeLoanStatus <= 3) {
       console.log('🎯 Handling loan with status:', activeLoanStatus);
-      // Go to loan details for approval or disbursement
       router.push(`/loan_details?loan_id=${activeLoan.id}&member_id=${memberId}`);
       return;
     }
@@ -242,11 +242,16 @@ const [activeLoanStatus, setActiveLoanStatus] = useState(null);
     }
     
     if (hasApprovedRequest) {
-      router.push(`/create_loan?client_id=${memberId}`);
+      router.push(`/create_loan?client_id=${memberId}&request_id=${pendingRequestId}`);
       return;
     }
     
-    // Priority 3: Default - apply for loan (no active loan process, no pending request)
+    // ✅ Priority 3: Default - apply for loan
+    // This now triggers when:
+    // - No active loan in process (status 0-3)
+    // - No pending request
+    // - No approved request
+    console.log('📝 Client can apply for new loan');
     router.push(`/applyLoan?client_id=${memberId}`);
   }
   else {
@@ -494,7 +499,7 @@ useEffect(() => {
     if (response.ok) {
       const data = await response.json();
       
-      console.log('📦 Full API Response:', JSON.stringify(data, null, 2));
+      //console.log('📦 Full API Response:', JSON.stringify(data, null, 2));
       
       if (data.success && Array.isArray(data.payload) && data.payload.length > 0) {
         const request = data.payload[0];
@@ -504,52 +509,37 @@ useEffect(() => {
                             request.request_status ?? 
                             request.approval_status;
         
-        console.log('✅ Request Status:', requestStatus);
-        console.log('🆔 Request ID:', request.id);
-        
-        // ✅ Check if request has been used (loan_id exists)
+       
         const hasLoanCreated = request.loan_id != null;
-        console.log('🏦 Has loan been created from this request?', hasLoanCreated);
         
-        // ✅ FIXED: Use passed loans or state loans
-        const loansToCheck = existingLoans !== null ? existingLoans : loans;
-        const hasActiveLoan = loansToCheck.some(loan => loan.status === 4);
-        console.log('🔵 Client has active disbursed loan?', hasActiveLoan);
-        console.log('🔵 Total loans to check:', loansToCheck.length);
-        
-        if (requestStatus === 0 && !hasLoanCreated && !hasActiveLoan) {
-          // Pending approval AND no loan created yet AND no active loans
-          console.log('🟡 Setting hasPendingRequest = true');
+        if (requestStatus === 0 && !hasLoanCreated) {
+          
           setHasPendingRequest(true);
           setPendingRequestId(request.id);
           setHasApprovedRequest(false);
-        } else if (requestStatus === 1 && !hasLoanCreated && !hasActiveLoan) {
-          // Approved BUT no loan created yet AND no active loans
-          console.log('🟢 Setting hasApprovedRequest = true');
+        } else if (requestStatus === 1 && !hasLoanCreated) {
+          
           setHasPendingRequest(false);
           setHasApprovedRequest(true);
           setPendingRequestId(request.id);
         } else {
-          // Request used, has active loan, or other status
-          console.log('⚪ Request has been used, client has active loan, or other status');
+          
           setHasPendingRequest(false);
           setHasApprovedRequest(false);
           setPendingRequestId(null);
         }
       } else {
-        console.log('❌ No requests found (empty payload)');
+        
         setHasPendingRequest(false);
         setHasApprovedRequest(false);
         setPendingRequestId(null);
       }
     } else {
-      console.log('⚠️ Response not OK:', response.status);
       setHasPendingRequest(false);
       setHasApprovedRequest(false);
       setPendingRequestId(null);
     }
   } catch (err) {
-    console.error('❌ Error checking pending request:', err);
     setHasPendingRequest(false);
     setHasApprovedRequest(false);
     setPendingRequestId(null);
@@ -815,23 +805,27 @@ const fetchLoanSummaryData = async () => {
       const allLoans = data.payload.all_loans || [];
       setLoans(allLoans);
       
-      // ✅ Check for loans in process (status 0-3)
+      // ✅ CRITICAL FIX: Only consider loans in process (status 0-3)
+      // Status 4 (disbursed) and above should NOT be considered "active" for button purposes
       const recentActiveLoan = allLoans.find(loan => 
-        loan.status === 0 || loan.status === 1 || loan.status === 2 || loan.status === 3
+        loan.status >= 0 && loan.status <= 3  // Only pre-disbursement statuses
       );
-      
+
       if (recentActiveLoan) {
         setActiveLoan(recentActiveLoan);
         setActiveLoanStatus(recentActiveLoan.status);
         console.log('✅ Active loan in process found:', recentActiveLoan);
         console.log('✅ Active loan status:', recentActiveLoan.status);
       } else {
+        // ✅ CRITICAL: Clear state when no loans in process (0-3)
+        // This now includes when loan reaches status 4 (disbursed) or higher
         setActiveLoan(null);
         setActiveLoanStatus(null);
-        console.log('❌ No active loan in process found - cleared state');
+        console.log('❌ No active loan in process (status 0-3) found - cleared state');
+        console.log('📋 Client can now apply for new loan');
       }
       
-      // ✅ FIXED: Pass the fresh loan data to checkPendingRequest
+      // ✅ Pass the fresh loan data to checkPendingRequest
       await checkPendingRequest(allLoans);
     }
     
@@ -1414,12 +1408,11 @@ const openApproveRequestModal = async () => {
       throw new Error('No token found');
     }
 
-    // Use the stored request ID
     if (!pendingRequestId) {
       throw new Error('No pending request found');
     }
 
-    // ✅ FIX: Fetch the client's requests again to get the full request object
+    // ✅ Fetch the client's requests
     const response = await fetch(
       `${API_BASE_URL}/api/loans/requests/client/${memberId}`,
       {
@@ -1437,12 +1430,18 @@ const openApproveRequestModal = async () => {
 
     const data = await response.json();
     
-    // ✅ Find the pending request from the array
     if (data.success && Array.isArray(data.payload) && data.payload.length > 0) {
       const pendingRequest = data.payload.find(req => req.id === pendingRequestId && req.status === 0);
       
       if (pendingRequest) {
-        setRequestDetails(pendingRequest);
+        // ✅ ADD: Enhance request details with loan limit and available credit
+        const enhancedRequest = {
+          ...pendingRequest,
+          loanLimit: customer?.loans?.loanLimit || 'Ksh 0 per product',
+          availableCredit: availableCredit || 0
+        };
+        
+        setRequestDetails(enhancedRequest);
         setApproveRequestModalVisible(true);
       } else {
         throw new Error('Pending request not found');
@@ -1491,8 +1490,6 @@ const handleApproveRequest = async () => {
     setApprovalNotes('');
     
     Alert.alert('Success', 'Loan request approved successfully. You can now create the loan.');
-    
-    // ✅ FIX: Refresh BOTH customer profile AND request status
     await fetchCustomerProfile();
     await checkPendingRequest();
     await fetchLoanSummaryData();
@@ -1582,10 +1579,10 @@ const handleReceivePayment = async () => {
   try {
     Alert.alert('Debug', 'handleReceivePayment started');
     
-    console.log('=== HANDLE RECEIVE PAYMENT ===');
-    console.log('Payment Amount:', paymentAmount);
-    console.log('Transaction Type:', transactionType);
-    console.log('Allocated Payments:', JSON.stringify(allocatedPayments, null, 2));
+    //console.log('=== HANDLE RECEIVE PAYMENT ===');
+    //console.log('Payment Amount:', paymentAmount);
+    //console.log('Transaction Type:', transactionType);
+    //console.log('Allocated Payments:', JSON.stringify(allocatedPayments, null, 2));
     
     if (!paymentAmount || parseFloat(paymentAmount) <= 0) {
       Alert.alert('Error', 'Please enter a valid payment amount');
@@ -1601,7 +1598,7 @@ const handleReceivePayment = async () => {
       p => p.type && p.amount && parseFloat(p.amount) > 0
     );
 
-    console.log('Valid Allocations:', JSON.stringify(validAllocations, null, 2));
+    //console.log('Valid Allocations:', JSON.stringify(validAllocations, null, 2));
 
     if (validAllocations.length === 0) {
       Alert.alert('Error', 'Please add at least one payment allocation');
@@ -1641,8 +1638,8 @@ const handleReceivePayment = async () => {
       JSON.stringify(allocations, null, 2)
     );
 
-    console.log('\n=== Final Allocations Array ===');
-    console.log(JSON.stringify(allocations, null, 2));
+    //console.log('\n=== Final Allocations Array ===');
+    //console.log(JSON.stringify(allocations, null, 2));
 
     const response = await fetch(`${API_BASE_URL}/api/payments/process`, {
       method: 'POST',
@@ -1894,10 +1891,39 @@ const handleSubmitAssessment = async () => {
               </TouchableOpacity>
               
               <TouchableOpacity 
-                style={styles.createLoanButtonSmall}
-                onPress={() => router.push(`/create_loan?client_id=${memberId}`)}
+                style={[
+                  styles.createLoanButtonSmall,
+                  requiredPaymentForTopup > 0 && styles.disabledButton  // ✅ Add disabled style
+                ]}
+                onPress={() => {
+                  // ✅ Check if required payment is greater than 0
+                  if (requiredPaymentForTopup > 0) {
+                    Alert.alert(
+                      'Payment Required',
+                      `You need to pay Ksh ${Math.round(requiredPaymentForTopup).toLocaleString()} before applying for a top-up loan.`,
+                      [{ text: 'OK' }]
+                    );
+                    return;
+                  }
+                  
+                  // Handle based on request status
+                  if (hasPendingRequest) {
+                    openApproveRequestModal();
+                  } else if (hasApprovedRequest) {
+                    router.push(`/create_loan?client_id=${memberId}&request_id=${pendingRequestId}`);
+                  } else {
+                    router.push(`/applyLoan?client_id=${memberId}`);
+                  }
+                }}
+                disabled={requiredPaymentForTopup > 0}  // ✅ Add disabled prop
               >
-                <Text style={styles.allocateButtonText}>Create Loan</Text>
+                <Text style={styles.allocateButtonText}>
+                  {hasPendingRequest 
+                    ? 'Approve' 
+                    : hasApprovedRequest 
+                      ? 'Create Loan' 
+                      : 'Apply Loan'}
+                </Text>
               </TouchableOpacity>
             </View>
           ) : (
@@ -3314,6 +3340,24 @@ const handleSubmitAssessment = async () => {
                     <Text style={styles.detailLabel}>Requested Amount:</Text>
                     <Text style={[styles.detailText, { fontWeight: '700', color: '#4285F4' }]}>
                       KES {Number(requestDetails.amount || 0).toLocaleString()}
+                    </Text>
+                  </View>
+
+                  {/* ✅ ADD: Loan Limit */}
+                  <View style={styles.detailRow}>
+                    <Ionicons name="card-outline" size={18} color="#333" />
+                    <Text style={styles.detailLabel}>Loan Limit:</Text>
+                    <Text style={[styles.detailText, { fontWeight: '600', color: '#666' }]}>
+                      {requestDetails.loanLimit || 'Ksh 0 per product'}
+                    </Text>
+                  </View>
+
+                  {/* ✅ ADD: Available Credit */}
+                  <View style={styles.detailRow}>
+                    <Ionicons name="trending-up-outline" size={18} color="#333" />
+                    <Text style={styles.detailLabel}>Available Credit:</Text>
+                    <Text style={[styles.detailText, { fontWeight: '600', color: '#4CAF50' }]}>
+                      KES {Number(requestDetails.availableCredit || 0).toLocaleString()}
                     </Text>
                   </View>
 
@@ -4807,6 +4851,16 @@ approveRequestTitle: {
 },
 approveRequestBody: {
   padding: 20,
+},
+createLoanButtonSmall: {
+  backgroundColor: '#2196F3',
+  paddingHorizontal: 12,
+  paddingVertical: 6,
+  borderRadius: 4,
+},
+disabledButton: {
+  backgroundColor: '#BDBDBD',  
+  opacity: 0.6,
 },
 });
 
