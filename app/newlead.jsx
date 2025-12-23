@@ -174,7 +174,7 @@ const handleSubmit = async () => {
 
     const data = JSON.parse(text);
 
-    console.log("Lead created successfully:", data);
+    //console.log("Lead created successfully:", data);
     alert("Lead submitted successfully!");
     navigation.goBack();
 

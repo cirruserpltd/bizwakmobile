@@ -307,51 +307,17 @@ const fetchRequestSummary = async (token) => {
 
 
       // Fetch all data in parallel
-      const [clientSum, loanSum] = await Promise.all([
+      const [clientSum, loanSum, requestSum] = await Promise.all([
         fetchClientSummary(token),
         fetchLoanSummary(token),
         fetchRequestSummary(token),
-        //fetchRequestSummary(token)
       ]);
 
-      // const collectionsResult = await collectionsResponse.json();
-      // const disbursementsResult = await disbursementsResponse.json();
-
-      // Update collections and disbursements
-      // if (collectionsResult.success && collectionsResult.payload) {
-      //   setCollectionsData(collectionsResult.payload);
-      //   const totalCollections = calculateTotal(collectionsResult.payload);
-        
-      //   setDashboardData(prev => ({
-      //     ...prev,
-      //     updates: {
-      //       ...prev.updates,
-      //       collections: totalCollections
-      //     }
-      //   }));
-      // }
-
-      // if (disbursementsResult.success && disbursementsResult.payload) {
-      //   setDisbursementsData(disbursementsResult.payload);
-      //   const totalDisbursements = calculateTotal(disbursementsResult.payload);
-        
-      //   setDashboardData(prev => ({
-      //     ...prev,
-      //     updates: {
-      //       ...prev.updates,
-      //       disbursements: totalDisbursements
-      //     }
-      //   }));
-      // }
 
       // Update action counts based on client and loan summaries
       if (clientSum || loanSum || requestSum) {
         updateActionCounts(clientSum, loanSum, requestSum); 
       }
-
-      // if (!collectionsResult.success || !disbursementsResult.success) {
-      //   throw new Error('Failed to fetch dashboard data');
-      // }
 
     } catch (err) {
       console.error('Error fetching dashboard data:', err);
@@ -512,10 +478,10 @@ const fetchRequestSummary = async (token) => {
         return;
       }
 
-      if (action.id === 15) {
-        router.push('/requestReport');
-        return;
-      }
+      // if (action.id === 15) {
+      //   router.push('/requestReport');
+      //   return;
+      // }
     const actionConfig = ACTION_STATUS_MAP[action.id];
     
      if (!actionConfig) {
@@ -545,9 +511,15 @@ const fetchRequestSummary = async (token) => {
       });
     }
     else if (actionConfig.type === 'request') {
-      router.push('/requestReport');
-    }
-  };
+        router.push({
+          pathname: '/requestReport',
+          params: { 
+            statusFilter: actionConfig.status,  
+            filterLabel: actionConfig.label      
+          }
+        });
+      }
+    };
 
   const handleProfilePress = () => {
     if (userId) {

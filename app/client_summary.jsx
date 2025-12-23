@@ -133,11 +133,17 @@ const ClientSummary = () => {
           statusValue: client.status,
         }));
 
+        const calculatedTotalPages = Math.ceil((data.all_items_total || 0) / itemsPerPage);
+        console.log('✅ Calculated Pages:', {
+          all_items_total: data.all_items_total,
+          itemsPerPage,
+          calculatedTotalPages
+        });
         
         setLeads(transformedLeads);
         setFilteredLeads(transformedLeads);
-        setTotalPages(data.total_pages || 1);
-        setCurrentPage(data.current_page || 1);
+        setTotalPages(calculatedTotalPages > 0 ? calculatedTotalPages : 1);
+        setCurrentPage(page);
       } else {
         Alert.alert('Error', data.error || 'Failed to fetch clients');
       }
@@ -403,7 +409,7 @@ const ClientSummary = () => {
           }
         />
 
-        {totalPages > 1 && (
+        {true && (
           <View style={styles.paginationContainer}>
             <TouchableOpacity
               style={[styles.paginationButton, currentPage === 1 && styles.disabledButton]}

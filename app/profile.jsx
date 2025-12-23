@@ -115,24 +115,157 @@ const Profile = () => {
   dailyInstlmntAmnt: 0,
   arraresToPay: 0
 });
-const [requiredPaymentForTopup, setRequiredPaymentForTopup] = useState(0);
-const [availableCredit, setAvailableCredit] = useState(0);
-const [activeLoansCount, setActiveLoansCount] = useState(0);
-const [branches, setBranches] = useState([]);
-const [selectedBranch, setSelectedBranch] = useState('');
-const [showBranchDropdown, setShowBranchDropdown] = useState(false);
-const [hasPendingRequest, setHasPendingRequest] = useState(false);
-const [pendingRequestId, setPendingRequestId] = useState(null);
-const [approveRequestModalVisible, setApproveRequestModalVisible] = useState(false);
-const [requestDetails, setRequestDetails] = useState(null);
-const [loadingRequest, setLoadingRequest] = useState(false);
-const [approvalNotes, setApprovalNotes] = useState('');
-const [hasApprovedRequest, setHasApprovedRequest] = useState(false);
-const [activeLoan, setActiveLoan] = useState(null);
-const [activeLoanStatus, setActiveLoanStatus] = useState(null);
+  const [requiredPaymentForTopup, setRequiredPaymentForTopup] = useState(0);
+  const [availableCredit, setAvailableCredit] = useState(0);
+  const [activeLoansCount, setActiveLoansCount] = useState(0);
+  const [branches, setBranches] = useState([]);
+  const [selectedBranch, setSelectedBranch] = useState('');
+  const [showBranchDropdown, setShowBranchDropdown] = useState(false);
+  const [hasPendingRequest, setHasPendingRequest] = useState(false);
+  const [pendingRequestId, setPendingRequestId] = useState(null);
+  const [approveRequestModalVisible, setApproveRequestModalVisible] = useState(false);
+  const [requestDetails, setRequestDetails] = useState(null);
+  const [loadingRequest, setLoadingRequest] = useState(false);
+  const [approvalNotes, setApprovalNotes] = useState('');
+  const [hasApprovedRequest, setHasApprovedRequest] = useState(false);
+  const [activeLoan, setActiveLoan] = useState(null);
+  const [activeLoanStatus, setActiveLoanStatus] = useState(null);
+  const [calculatorModalVisible, setCalculatorModalVisible] = useState(false);
+  const [calculatorData, setCalculatorData] = useState({
+    topupAmount: 0,
+    requiredPayment: 0,
+    projectedInstallments: 0
+  });
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertConfig, setAlertConfig] = useState({
+    title: '',
+    message: '',
+    type: 'error' 
+  });
+  const INTEREST_RATE = 1.3; 
+  const DAYS = 30;
 
 
+  const calculateRequiredPayment = (topup) => {
+  if (topup <= 0) return requiredPaymentForTopup;
   
+  // Available credit after making the minimum payment
+  const creditAfterMinPayment = availableCredit + requiredPaymentForTopup;
+  
+  // If available credit is enough, return minimum payment
+  if (creditAfterMinPayment >= topup) {
+    return requiredPaymentForTopup;
+  }
+  
+  // Otherwise, calculate additional payment needed
+  const additionalPaymentNeeded = topup - creditAfterMinPayment;
+  return requiredPaymentForTopup + additionalPaymentNeeded;
+};
+
+const calculateProjectedInstallments = (repayableAmount) => {
+  const totalOutstanding = (cumulativeTotals?.totalBalance || 0) + repayableAmount;
+  return totalOutstanding / DAYS;
+};
+
+const calculateTopupFromPayment = (payment) => {
+  const creditAfterPayment = (availableCredit + payment);
+  return creditAfterPayment;
+};
+
+const calculateTopupFromInstallments = (installments) => {
+  // Total outstanding that would result in these installments
+  const targetTotalOutstanding = installments * DAYS;
+  
+  // Current balance
+  const currentBalance = (cumulativeTotals?.totalBalance || 0);
+  
+  // Required repayable amount
+  const requiredRepayable = (targetTotalOutstanding - currentBalance) + requiredPaymentForTopup;
+  
+  // Back-calculate principal (repayable = principal * 1.3)
+  const principal = requiredRepayable / INTEREST_RATE;
+  
+  return Math.max(0, principal);
+};
+
+const showCustomAlert = (title, message, type = 'error') => {
+  setAlertConfig({ title, message, type });
+  setAlertVisible(true);
+};
+
+  const handleCalculatorInputChange = (field, value) => {
+  const numValue = Math.round(parseFloat(value) || 0);
+  
+  if (field === 'topupAmount') {
+    const maxTopup = (availableCredit || 0) + (cumulativeTotals?.totalBalance || 0);
+    if (numValue > maxTopup) {
+      showCustomAlert(
+        'Limit Exceeded',
+        `Top-up amount exceeds allowed limit of KES ${Math.round(maxTopup).toLocaleString()}`,
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+    
+    const newRequiredPayment = Math.round(calculateRequiredPayment(numValue));
+    const netRepayableAmount = (numValue * INTEREST_RATE) - newRequiredPayment;
+    const newInstallments = Math.round(calculateProjectedInstallments(netRepayableAmount));
+    
+    setCalculatorData({
+      topupAmount: numValue,
+      requiredPayment: newRequiredPayment,
+      projectedInstallments: newInstallments
+    });
+  } else if (field === 'requiredPayment') {
+    const maxPayment = cumulativeTotals?.totalBalance || 0;
+    if (numValue > maxPayment) {
+      showCustomAlert(
+        'Limit Exceeded',
+        `Required payment exceeds allowed limit of KES ${Math.round(maxPayment).toLocaleString()}`,
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+    
+    const newTopup = Math.round(calculateTopupFromPayment(numValue));
+    const netRepayableAmount = (newTopup * INTEREST_RATE) - numValue;
+    const newInstallments = Math.round(calculateProjectedInstallments(netRepayableAmount));
+    
+    setCalculatorData({
+      topupAmount: newTopup,
+      requiredPayment: numValue,
+      projectedInstallments: newInstallments
+    });
+  } else if (field === 'projectedInstallments') {
+    const maxInstallments = (((availableCredit || 0) + (cumulativeTotals?.totalBalance || 0)) * 1.3) / 30;
+    if (numValue > maxInstallments) {
+      showCustomAlert(
+        'Limit Exceeded',
+        `Installment amount exceeds daily limit of KES ${Math.round(maxInstallments).toLocaleString()}`,
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+    
+    // if (numValue < 434) {
+    //   Alert.alert(
+    //     'Below Minimum',
+    //     'Installment amount is lower than minimum of KES 434',
+    //     [{ text: 'OK' }]
+    //   );
+    //   return;
+    // }
+    
+    const newTopup = Math.round(calculateTopupFromInstallments(numValue));
+    const newRequiredPayment = Math.round(calculateRequiredPayment(newTopup));
+    
+    setCalculatorData({
+      topupAmount: newTopup,
+      requiredPayment: newRequiredPayment,
+      projectedInstallments: numValue
+    });
+  }
+};
 
   const addAllocation = () => {
     setAllocatedPayments([...allocatedPayments, { type: '', amount: '' }]);
@@ -412,11 +545,11 @@ useEffect(() => {
         loans: {
           noOfLoans: data.client.loan_count || data.client.no_of_loans || 0,
           loanLimit: data.client.loan_limit 
-            ? `Ksh ${data.client.loan_limit} per product` 
-            : 'Ksh 0 per product',
+            ? `Ksh ${data.client.loan_limit}` 
+            : 'Ksh 0',
           loanLimitApproved: data.client.approved_loan_limit 
-            ? `Ksh ${data.client.approved_loan_limit} per product` 
-            : 'Ksh 0 per product',
+            ? `Ksh ${data.client.approved_loan_limit}` 
+            : 'Ksh 0',
           loanPrincipal: data.client.loan_principal 
             ? `Ksh ${data.client.loan_principal}` 
             : '-',
@@ -890,7 +1023,7 @@ const calculateLoanSummary = () => {
 
   return {
     noOfLoans: activeLoansCount,
-    loanLimit: customer?.loans?.loanLimit || 'Ksh 0 per product',
+    loanLimit: customer?.loans?.loanLimitApproved || 'Ksh 0 per product',
     loanPrincipal: `Ksh ${(cumulativeTotals.totalPrincipal || 0).toLocaleString()}`,
     dateDisbursed: latestDisbursement ? latestDisbursement.toLocaleDateString() : '-',
     loanDueDate: nearestDueDate ? nearestDueDate.toLocaleDateString() : '-',
@@ -2173,9 +2306,23 @@ const handleSubmitAssessment = async () => {
 
                 {/* Action Buttons Grid */}
                 <View style={styles.actionButtonsGrid}>
-          <TouchableOpacity style={[styles.actionButton, styles.locationButton]}>
+          {/* <TouchableOpacity style={[styles.actionButton, styles.locationButton]}>
             <Ionicons name="location-outline" size={18} color="#fff" />
             <Text style={styles.actionButtonText}>Location</Text>
+          </TouchableOpacity> */}
+          <TouchableOpacity 
+            style={[styles.actionButton, styles.calculatorButton]}
+            onPress={() => {
+              setCalculatorData({
+                topupAmount: 0,
+                requiredPayment: 0,  // ✅ Start at 0
+                projectedInstallments: 0  // ✅ Start at 0
+              });
+              setCalculatorModalVisible(true);
+            }}
+          >
+            <Ionicons name="calculator-outline" size={18} color="#fff" />
+            <Text style={styles.actionButtonText}>Loan Calculator</Text>
           </TouchableOpacity>
           
           <TouchableOpacity style={[styles.actionButton, styles.paroButton]}>
@@ -3752,6 +3899,175 @@ const handleSubmitAssessment = async () => {
           </View>
         </View>
       </Modal>
+      {/* Loan Calculator Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={calculatorModalVisible}
+        onRequestClose={() => setCalculatorModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.calculatorModalContent}>
+            <View style={styles.calculatorHeader}>
+              <Text style={styles.calculatorTitle}>
+                Calculate Loan for {customer?.name}
+              </Text>
+              <TouchableOpacity 
+                onPress={() => setCalculatorModalVisible(false)}
+                style={styles.closeButton}
+              >
+                <Ionicons name="close" size={24} color="#333" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.calculatorBody}>
+              {/* Current Status Section */}
+              <View style={styles.currentStatusSection}>
+                <View style={styles.statusHeader}>
+                  <Ionicons name="information-circle-outline" size={20} color="#333" />
+                  <Text style={styles.statusHeaderText}>Current Status</Text>
+                </View>
+                
+                <View style={styles.statusGrid}>
+                  <View style={styles.statusItem}>
+                    <Text style={styles.statusLabel}>Loan Limit:</Text>
+                    <Text style={styles.statusValue}>
+                      KES {(customer?.loans?.loanLimitApproved?.match(/\d+/)?.[0] || 0).toLocaleString()}
+                    </Text>
+                  </View>
+
+                  <View style={styles.statusItem}>
+                    <Text style={styles.statusLabel}>Amnt Bal for Next Top-up:</Text>
+                    <Text style={styles.statusValue}>
+                      KES {Math.round(requiredPaymentForTopup || 0).toLocaleString()}
+                    </Text>
+                  </View>
+                  
+                  <View style={styles.statusItem}>
+                    <Text style={styles.statusLabel}>Total Loan Balance:</Text>
+                    <Text style={styles.statusValue}>
+                      KES {(cumulativeTotals?.totalBalance || 0).toLocaleString()}
+                    </Text>
+                  </View>
+                  
+                  <View style={styles.statusItem}>
+                    <Text style={styles.statusLabel}>Available Top-up:</Text>
+                    <Text style={styles.statusValue}>
+                      KES {(availableCredit || 0).toLocaleString()}
+                    </Text>
+                  </View>
+                  
+                  <View style={styles.statusItem}>
+                    <Text style={styles.statusLabel}>Current Daily Installment:</Text>
+                    <Text style={styles.statusValue}>
+                      KES {(cumulativeTotals?.dailyInstlmntAmnt || 0).toLocaleString()}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+            <View style={styles.calculatorInputsSection}>
+              <Text style={styles.calculatorSectionTitle}>
+                Top-up Calculator (Input any of the 3 fields below)
+              </Text>
+              {/* Required Payment */}
+              <View style={styles.calculatorInputGroup}>
+                <Text style={styles.calculatorLabel}>Projected Amount to Pay for Next Top-up (KES)</Text>
+                <TextInput
+                  style={styles.calculatorInput}
+                  value={calculatorData.requiredPayment.toString()}
+                  onChangeText={(text) => handleCalculatorInputChange('requiredPayment', text)}
+                  keyboardType="numeric"
+                  placeholder="Enter required payment"
+                />
+                <Text style={styles.calculatorHint}>
+                  Minimum payment: KES {Math.round(requiredPaymentForTopup || 0).toLocaleString()}
+                </Text>
+              </View>
+
+              {/* Top-up Amount */}
+              <View style={styles.calculatorInputGroup}>
+                <Text style={styles.calculatorLabel}>Projected Top-up Amount (KES)</Text>
+                <TextInput
+                  style={styles.calculatorInput}
+                  value={calculatorData.topupAmount.toString()}
+                  onChangeText={(text) => handleCalculatorInputChange('topupAmount', text)}
+                  keyboardType="numeric"
+                  placeholder="Enter top-up amount"
+                />
+              </View>
+
+              {/* Projected Installments */}
+              <View style={styles.calculatorInputGroup}>
+                <Text style={styles.calculatorLabel}>Projected Daily Installments (KES)</Text>
+                <TextInput
+                  style={styles.calculatorInput}
+                  value={calculatorData.projectedInstallments.toString()}
+                  onChangeText={(text) => handleCalculatorInputChange('projectedInstallments', text)}
+                  keyboardType="numeric"
+                  placeholder="Enter projected daily installments"
+                />
+                <Text style={styles.calculatorHint}>
+                  Not less than KES 434 and not more than KES {Math.round((((availableCredit || 0) + (cumulativeTotals?.totalBalance || 0)) * 1.3) / 30).toLocaleString()} per day
+                </Text>
+              </View>
+            </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+      {/* Custom Alert Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={alertVisible}
+        onRequestClose={() => setAlertVisible(false)}
+        statusBarTranslucent={true}  
+      >
+        <View style={styles.customAlertOverlay}>
+          <View style={styles.customAlertContainer}>
+            <View style={[
+              styles.customAlertIconContainer,
+              alertConfig.type === 'error' && styles.customAlertIconError,
+              alertConfig.type === 'warning' && styles.customAlertIconWarning,
+              alertConfig.type === 'success' && styles.customAlertIconSuccess,
+              alertConfig.type === 'info' && styles.customAlertIconInfo,
+            ]}>
+              <Ionicons 
+                name={
+                  alertConfig.type === 'error' ? 'close-circle' :
+                  alertConfig.type === 'warning' ? 'warning' :
+                  alertConfig.type === 'success' ? 'checkmark-circle' :
+                  'information-circle'
+                }
+                size={50}
+                color="#954d4dff"
+              />
+            </View>
+            
+            {/* Title */}
+            <Text style={styles.customAlertTitle}>{alertConfig.title}</Text>
+            
+            {/* Message */}
+            <Text style={styles.customAlertMessage}>{alertConfig.message}</Text>
+            
+            {/* OK Button */}
+            <TouchableOpacity
+              style={[
+                styles.customAlertButton,
+                alertConfig.type === 'error' && styles.customAlertButtonError,
+                alertConfig.type === 'warning' && styles.customAlertButtonWarning,
+                alertConfig.type === 'success' && styles.customAlertButtonSuccess,
+                alertConfig.type === 'info' && styles.customAlertButtonInfo,
+              ]}
+              onPress={() => setAlertVisible(false)}
+              activeOpacity={0.8}  
+            >
+              <Text style={styles.customAlertButtonText}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -4905,6 +5221,242 @@ createLoanButtonSmall: {
 disabledButton: {
   backgroundColor: '#BDBDBD',  
   opacity: 0.6,
+},
+calculatorButton: {
+  backgroundColor: '#9C27B0',
+},
+calculatorModalContent: {
+  backgroundColor: '#fff',
+  borderRadius: 16,
+  width: '90%',
+  maxHeight: '85%',
+  overflow: 'hidden',
+},
+calculatorHeader: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  paddingHorizontal: 20,
+  paddingVertical: 16,
+  borderBottomWidth: 1,
+  borderBottomColor: '#e0e0e0',
+},
+calculatorTitle: {
+  fontSize: 18,
+  fontWeight: '600',
+  color: '#333',
+  flex: 1,
+  marginRight: 12,
+},
+calculatorBody: {
+  padding: 20,
+},
+currentStatusSection: {
+  backgroundColor: '#f8f9fa',
+  padding: 16,
+  borderRadius: 8,
+  marginBottom: 20,
+},
+statusHeader: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 8,
+  marginBottom: 12,
+},
+statusHeaderText: {
+  fontSize: 16,
+  fontWeight: '600',
+  color: '#333',
+},
+statusGrid: {
+  flexDirection: 'row',
+  flexWrap: 'wrap',
+  gap: 12,
+},
+statusItem: {
+  width: '48%',
+},
+statusLabel: {
+  fontSize: 12,
+  color: '#666',
+  marginBottom: 4,
+},
+statusValue: {
+  fontSize: 14,
+  fontWeight: '600',
+  color: '#333',
+},
+calculatorInputsSection: {
+  marginBottom: 20,
+},
+calculatorInputGroup: {
+  marginBottom: 20,
+},
+calculatorLabel: {
+  fontSize: 14,
+  fontWeight: '600',
+  color: '#333',
+  marginBottom: 8,
+},
+calculatorInput: {
+  borderWidth: 2,
+  borderColor: '#ddd',
+  borderRadius: 6,
+  paddingHorizontal: 14,
+  paddingVertical: 12,
+  fontSize: 16,
+  color: '#333',
+  backgroundColor: '#fff',
+},
+calculatorHint: {
+  fontSize: 12,
+  color: '#666',
+  fontStyle: 'italic',
+  marginTop: 4,
+},
+calculationSummary: {
+  backgroundColor: '#e7f3ff',
+  padding: 16,
+  borderRadius: 8,
+  borderWidth: 1,
+  borderColor: '#90caf9',
+},
+summaryHeader: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 8,
+  marginBottom: 12,
+  paddingBottom: 12,
+  borderBottomWidth: 1,
+  borderBottomColor: '#90caf9',
+},
+summaryHeaderText: {
+  fontSize: 16,
+  fontWeight: '600',
+  color: '#1976d2',
+},
+summaryItem: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  paddingVertical: 8,
+},
+summaryItemLabel: {
+  fontSize: 14,
+  color: '#333',
+  flex: 1,
+},
+summaryItemValue: {
+  fontSize: 14,
+  fontWeight: '600',
+  color: '#333',
+},
+summaryItemHint: {
+  fontSize: 12,
+  color: '#666',
+  fontWeight: '400',
+},
+summaryItemHighlight: {
+  paddingTop: 12,
+  marginTop: 8,
+  borderTopWidth: 1,
+  borderTopColor: '#90caf9',
+},
+summaryItemLabelBold: {
+  fontWeight: '700',
+  color: '#1976d2',
+},
+summaryItemValueBold: {
+  fontSize: 16,
+  fontWeight: '700',
+  color: '#1976d2',
+},
+calculatorSectionTitle: {
+  fontSize: 16,
+  fontWeight: '700',
+  color: '#D32F2F',  
+  marginBottom: 16,
+  textAlign: 'center',
+},
+customAlertOverlay: {
+  flex: 1,
+  backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  justifyContent: 'center',
+  alignItems: 'center',
+  padding: 20,
+  zIndex: 9999,  
+},
+customAlertContainer: {
+  backgroundColor: '#fff',
+  borderRadius: 16,
+  padding: 24,
+  width: '90%',
+  maxWidth: 400,
+  alignItems: 'center',
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 4 },
+  shadowOpacity: 0.3,
+  shadowRadius: 8,
+  elevation: 8,
+  zIndex: 10000,
+},
+customAlertIconContainer: {
+  width: 80,
+  height: 80,
+  borderRadius: 40,
+  justifyContent: 'center',
+  alignItems: 'center',
+  marginBottom: 16,
+},
+customAlertIconError: {
+  backgroundColor: '#F44336',
+},
+customAlertIconWarning: {
+  backgroundColor: '#FF9800',
+},
+customAlertIconSuccess: {
+  backgroundColor: '#4CAF50',
+},
+customAlertIconInfo: {
+  backgroundColor: '#2196F3',
+},
+customAlertTitle: {
+  fontSize: 20,
+  fontWeight: '700',
+  color: '#333',
+  marginBottom: 12,
+  textAlign: 'center',
+},
+customAlertMessage: {
+  fontSize: 15,
+  color: '#666',
+  lineHeight: 22,
+  textAlign: 'center',
+  marginBottom: 24,
+},
+customAlertButton: {
+  paddingHorizontal: 40,
+  paddingVertical: 12,
+  borderRadius: 8,
+  minWidth: 120,
+},
+customAlertButtonError: {
+  backgroundColor: '#F44336',
+},
+customAlertButtonWarning: {
+  backgroundColor: '#FF9800',
+},
+customAlertButtonSuccess: {
+  backgroundColor: '#4CAF50',
+},
+customAlertButtonInfo: {
+  backgroundColor: '#2196F3',
+},
+customAlertButtonText: {
+  color: '#1d8dbaff',
+  fontSize: 16,
+  fontWeight: '600',
+  textAlign: 'center',
 },
 });
 

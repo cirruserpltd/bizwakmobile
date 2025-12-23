@@ -372,7 +372,7 @@ export default function HomeScreen() {
     }
 
     const result = await response.json();
-    console.log("Cash Balance Payload:", result.payload);
+    //console.log("Cash Balance Payload:", result.payload);
 
     if (result.success && result.payload) {
       setCashBalanceData(result.payload);
@@ -452,7 +452,7 @@ const fetchCollections = async () => {
       queryParams += `&cluster_id=${selectedView.id}`;
     }
 
-    console.log('Fetching collections with params:', queryParams); 
+    //console.log('Fetching collections with params:', queryParams); 
 
     const response = await fetch(`${API_BASE_URL}/api/collections?${queryParams}`, {
       method: 'GET',
@@ -470,7 +470,7 @@ const fetchCollections = async () => {
     }
 
     const result = await response.json();
-    console.log('Collections result:', result); 
+    //console.log('Collections result:', result); 
 
     if (result.success && result.payload) {
       setCollectionsData(result.payload);
@@ -501,7 +501,7 @@ const fetchDisbursements = async () => {
       queryParams += `&cluster_id=${selectedView.id}`;
     }
 
-    console.log('Fetching disbursements with params:', queryParams); 
+    //console.log('Fetching disbursements with params:', queryParams); 
 
     const response = await fetch(`${API_BASE_URL}/api/disbursements?${queryParams}`, {
       method: 'GET',
@@ -519,7 +519,7 @@ const fetchDisbursements = async () => {
     }
 
     const result = await response.json();
-    console.log('Disbursements result:', result); 
+    //console.log('Disbursements result:', result); 
 
     if (result.success && result.payload) {
       setDisbursementsData(result.payload);
