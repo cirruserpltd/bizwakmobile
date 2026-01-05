@@ -57,7 +57,7 @@ const actions = () => {
       { id: 14, label: 'Apply Loan', icon: 'cash', color: '#D1F4F7', iconColor: '#00BCD4', borderColor: '#00BCD4', route: '/client_summary' },
       { id: 15, label: 'Approve Loan Request TL', icon: 'checkmark-done', color: '#FFF9E6', iconColor: '#F57C00', borderColor: '#F57C00', count: 0, route: '/requestReport' },
       //{ id: 8, label: 'Apply Loan/ Top Up', icon: 'hand-left', color: '#D1F4F7', iconColor: '#00BCD4', borderColor: '#00BCD4', route: 'ApplyLoan' },
-      { id: 9, label: 'Create Loan/Top Up', icon: 'hand-left', color: '#D1F4F7', iconColor: '#00BCD4', borderColor: '#2196F3', route: '/create_loan' },
+      { id: 9, label: 'Create Loan/Top Up', icon: 'hand-left', color: '#D1F4F7', iconColor: '#00BCD4', borderColor: '#2196F3', route: '/requestReport' },
       { id: 10, label: 'Approve Loan TL', icon: 'document-text', color: '#FFF9E6', iconColor: '#F57C00', borderColor: '#F57C00', subtitle: 'Ksh 0', count: 0, route: '/loan_summary' },
       { id: 11, label: 'Approve Loan HQ', icon: 'document-text', color: '#FFF9E6', iconColor: '#F57C00', borderColor: '#F57C00', subtitle: 'Ksh 0', count: 0, route: '/loan_summary' },
       { id: 12, label: 'Disburse Loan', icon: 'send', color: '#E3F2FD', iconColor: '#1976D2', borderColor: '#2196F3', subtitle: 'Ksh 0', count: 0, route: '/onboard' },
@@ -75,7 +75,7 @@ const actions = () => {
     //14: { status: 10, label: 'Dormant', type: 'client' }, 
     15: { status: 0, label: 'Pending Approval Request', type: 'request' }, 
     // ID 8 removed - not in your actions array
-    9: { status: 10, label: 'Dormant', type: 'client' }, 
+    9: { status: 1, label: 'Approved', type: 'request' }, 
     10: { status: 0, label: 'Pending BM Approval', type: 'loan' },
     11: { status: 2, label: 'Pending HQ Approval', type: 'loan' },
     12: { status: 3, label: 'Pending Disbursement', type: 'loan' },
@@ -376,9 +376,11 @@ const fetchRequestSummary = async (token) => {
           const applyLoanCount = (clientSum?.total_dormant || 0) + (clientSum?.total_active || 0);
           return { ...action, count: applyLoanCount };
           
-        case 9: // Create Loan - Dormant (status 10) + Active (status 11)
-          const createLoanCount = (clientSum?.total_dormant || 0) + (clientSum?.total_active || 0);
-          return { ...action, count: createLoanCount };
+       case 9: // Create Loan/Top Up - Show Approved requests (status 1)
+        return { 
+          ...action, 
+          count: requestSum?.total_approved || 0
+        };
         
         case 10: { // Approve Loan TL
           const amount = loanSum?.total_pending_bm_approval_amount || 0;

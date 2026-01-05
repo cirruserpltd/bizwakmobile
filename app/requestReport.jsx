@@ -224,7 +224,7 @@ export default function LoanRequestsScreen() {
           <TouchableOpacity 
             onPress={() => {
               setActiveFilter(null);
-              router.replace('/loan_requests');
+              router.replace('/requestReport');
             }} 
             style={styles.clearFilterButton}
           >
