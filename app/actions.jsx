@@ -783,6 +783,15 @@ const fetchRequestSummary = async (token) => {
             <Ionicons name="warning" size={18} color="#FF6B6B" />
             <Text style={styles.arrearsButtonText}>Arrears</Text>
           </TouchableOpacity>
+           {/*Defaulted Loans Button */}
+          <TouchableOpacity 
+            style={styles.defaultedButton}
+            onPress={() => router.push('/defaultedLoans')}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="alert-circle" size={18} color="#E53935" />
+            <Text style={styles.defaultedButtonText}>Defaulted</Text>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -1203,6 +1212,24 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#FF6B6B',
+    marginLeft: 6,
+  },
+  defaultedButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFEBEE',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E53935',
+    marginTop: 8,
+    marginLeft: 'auto',
+  },
+  defaultedButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#E53935',
     marginLeft: 6,
   },
   
