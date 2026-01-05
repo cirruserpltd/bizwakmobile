@@ -134,7 +134,7 @@ const ClientSummary = () => {
         }));
 
         const calculatedTotalPages = Math.ceil((data.all_items_total || 0) / itemsPerPage);
-        console.log('✅ Calculated Pages:', {
+        console.log('Calculated Pages:', {
           all_items_total: data.all_items_total,
           itemsPerPage,
           calculatedTotalPages

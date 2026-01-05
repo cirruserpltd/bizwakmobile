@@ -846,8 +846,10 @@ const calculateTotal = (groupedData) => {
       </View>
     );
   }
-  const branchName = Object.keys(cashBalanceData || {})[0];
-  const branchRecord = cashBalanceData?.[branchName]?.[0] || {}
+  
+
+  const totalExpenses = Object.values(cashBalanceData).flat().reduce((acc, item) => acc + (item.expenses || 0), 0);
+  const totalCashBalance = Object.values(cashBalanceData).flat().reduce((acc, item) => acc + (item.amount || 0), 0);
 
   return (
     <View style={styles.card}>
@@ -859,13 +861,13 @@ const calculateTotal = (groupedData) => {
       <View style={styles.summaryRow}>
         <View style={[styles.summaryBox, { backgroundColor: '#FFE0B2', borderColor: '#FF6F00' }]}>
           <Text style={[styles.summaryValue, { color: '#E65100' }]}>
-            {(branchRecord.expenses || 0).toLocaleString('en-US', { minimumFractionDigits: 0 })}
+            {(totalExpenses || 0).toLocaleString('en-US', { minimumFractionDigits: 0 })}
           </Text>
           <Text style={styles.summaryLabel}>Expenses</Text>
         </View>
         <View style={[styles.summaryBox, { backgroundColor: '#E8F5E9', borderColor: '#00C853' }]}>
           <Text style={[styles.summaryValue, { color: '#00C853' }]}>
-            {(branchRecord.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 0 })}
+            {(totalCashBalance || 0).toLocaleString('en-US', { minimumFractionDigits: 0 })}
           </Text>
           <Text style={styles.summaryLabel}>Cash Balance</Text>
         </View>

@@ -396,7 +396,7 @@ const showCustomAlert = (title, message, type = 'error') => {
 
 useFocusEffect(
   React.useCallback(() => {
-    console.log('🔄 Profile screen focused - refreshing data');
+    console.log('Profile screen focused - refreshing data');
     if (memberId) {
       fetchCustomerProfile();
       fetchLoanSummaryData(); 
@@ -3932,10 +3932,9 @@ const handleSubmitAssessment = async () => {
                   <View style={styles.statusItem}>
                     <Text style={styles.statusLabel}>Loan Limit:</Text>
                     <Text style={styles.statusValue}>
-                      KES {(customer?.loans?.loanLimitApproved?.match(/\d+/)?.[0] || 0).toLocaleString()}
+                      KES {Number(customer?.loans?.loanLimitApproved?.match(/\d+/)?.[0] || 0).toLocaleString()}
                     </Text>
                   </View>
-
                   <View style={styles.statusItem}>
                     <Text style={styles.statusLabel}>Amnt Bal for Next Top-up:</Text>
                     <Text style={styles.statusValue}>
@@ -3995,6 +3994,9 @@ const handleSubmitAssessment = async () => {
                   keyboardType="numeric"
                   placeholder="Enter top-up amount"
                 />
+                <Text style={styles.calculatorHint}>
+                  Access Fee Required:  KES {Math.round((calculatorData.topupAmount || 0) * 3 / 100).toLocaleString()}
+                </Text>
               </View>
 
               {/* Projected Installments */}
