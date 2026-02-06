@@ -519,8 +519,8 @@ useEffect(() => {
       const mappedCustomer = {
         name: data.client.name || 'N/A',
         phone: data.client.phone || 'N/A',
-        team: data.teams && data.teams.length > 0 ? data.teams[0].name : 'Not Assigned',
-        branch: data.teams && data.teams[0]?.branch?.name ? data.teams[0].branch.name : 'N/A',
+        team: data.client.team_name || 'Not Assigned',
+        branch: data.client.branch_name || 'N/A',
         status: (() => {
           const statusMap = {
             0: 'Pending Allocation',
