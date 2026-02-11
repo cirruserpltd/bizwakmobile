@@ -35,25 +35,25 @@ export default function LoansReportScreen() {
   }, []);
 
   // Fetch data when token, page, or search changes
-  useEffect(() => {
-    if (token) {
-      fetchLoansReport();
-    }
-  }, [token, currentPage, searchQuery]);
+ useEffect(() => {
+  if (!token) return;
 
-  useEffect(() => {
-    if (token && params?.statusFilter !== undefined) {
-      setActiveFilter(params.statusFilter);
-      setDueInDaysFilter(null); 
-      fetchLoansReport({ status: params.statusFilter });
-    } else if (token && params?.dueInDays !== undefined) {
-      setDueInDaysFilter(params.dueInDays);
-      setActiveFilter(null); 
-      fetchLoansReport({ due_in_days: params.dueInDays });
-    } else if (token) {
-      fetchLoansReport();
-    }
-  }, [token, currentPage, params?.statusFilter, params?.dueInDays]);
+  // Build filters from params
+  if (params?.statusFilter !== undefined && params.statusFilter !== null) {
+    setActiveFilter(params.statusFilter);
+    setDueInDaysFilter(null);
+    fetchLoansReport({ status: params.statusFilter });
+  } else if (params?.dueInDays !== undefined && params.dueInDays !== null) {
+    setDueInDaysFilter(params.dueInDays);
+    setActiveFilter(null);
+    fetchLoansReport({ due_in_days: params.dueInDays });
+  } else {
+    setActiveFilter(null);
+    setDueInDaysFilter(null);
+    fetchLoansReport();
+  }
+}, [token, currentPage, searchQuery, params?.statusFilter, params?.dueInDays]);
+
   const getToken = async () => {
     try {
       const storedToken = await AsyncStorage.getItem('token');
