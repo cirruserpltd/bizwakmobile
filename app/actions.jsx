@@ -533,6 +533,15 @@ const fetchRequestSummary = async (token) => {
       console.log('No user ID found');
     }
   };
+  const handleLoansDuePress = () => {
+    router.push({
+      pathname: '/loan_summary',
+      params: { 
+        dueInDays: 3,
+        filterLabel: 'Loans Due in 3 Days'
+      }
+    });
+  };
 
 //  const fetchRequestSummary = async (token) => {
 //   try {
@@ -766,6 +775,14 @@ const fetchRequestSummary = async (token) => {
               </View>
             </TouchableOpacity>
           </View>
+            <TouchableOpacity 
+            style={styles.loansDueButton}
+            onPress={handleLoansDuePress}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="time-outline" size={18} color="#FF9800" />
+            <Text style={styles.loansDueButtonText}>Loans</Text>
+          </TouchableOpacity>
         </View>
         
         <View style={styles.dateRight}>
@@ -1234,6 +1251,24 @@ const styles = StyleSheet.create({
     color: '#E53935',
     marginLeft: 6,
   },
+  loansDueButton: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  backgroundColor: '#FFF3E0',
+  paddingHorizontal: 12,
+  paddingVertical: 8,
+  borderRadius: 12,
+  borderWidth: 1,
+  borderColor: '#FF9800',
+  marginTop: 12,
+  alignSelf: 'flex-start',
+},
+loansDueButtonText: {
+  fontSize: 12,
+  fontWeight: '600',
+  color: '#FF9800',
+  marginLeft: 6,
+},
   
 });
 export default actions;

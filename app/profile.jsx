@@ -145,6 +145,11 @@ const Profile = () => {
   const INTEREST_RATE = 1.3; 
   const DAYS = 30;
 
+  const [payments, setPayments] = useState([]);
+  const [loadingPayments, setLoadingPayments] = useState(false);
+  const [paymentsPage, setPaymentsPage] = useState(1);
+  const [paymentsTotal, setPaymentsTotal] = useState(0);
+
 
   const calculateRequiredPayment = (topup) => {
   if (topup <= 0) return requiredPaymentForTopup;
@@ -409,6 +414,7 @@ useEffect(() => {
     fetchCustomerProfile();
     fetchLoanSummaryData(); 
     fetchDisbursements();
+    fetchPayments();
     fetchAllUsers();
   } else {
     setError('No member ID provided');
@@ -914,6 +920,47 @@ const fetchDisbursements = async (page = 1) => {
     Alert.alert('Error', `Failed to load disbursements: ${err.message}`);
   } finally {
     setLoadingDisbursements(false);
+  }
+};
+const fetchPayments = async (page = 1) => {
+  try {
+    setLoadingPayments(true);
+    const token = await AsyncStorage.getItem('token');
+    
+    if (!token) {
+      throw new Error('No token found');
+    }
+
+    const response = await fetch(
+      `${API_BASE_URL}/api/payments/${memberId}?page=${page}&per_page=5`,
+      {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    
+    if (data.success && data.payload) {
+      setPayments(data.payload);
+      setPaymentsTotal(data.pagination?.total || 0);
+      setPaymentsPage(page);
+    } else {
+      setPayments([]);
+    }
+    
+  } catch (err) {
+    console.error('Error fetching payments:', err);
+    Alert.alert('Error', `Failed to load payments: ${err.message}`);
+  } finally {
+    setLoadingPayments(false);
   }
 };
 const fetchLoanSummaryData = async () => {
@@ -2382,11 +2429,11 @@ const handleSubmitAssessment = async () => {
           </TouchableOpacity>
           
           <TouchableOpacity 
-            style={[styles.tab, activeTab === 'Instls Due' && styles.activeTab]}
-            onPress={() => setActiveTab('Instls Due')}
+            style={[styles.tab, activeTab === 'Payments' && styles.activeTab]}
+            onPress={() => setActiveTab('Payments')}
           >
-            <Text style={[styles.tabText, activeTab === 'Instls Due' && styles.activeTabText]}>
-              Instls Due
+            <Text style={[styles.tabText, activeTab === 'Payments' && styles.activeTabText]}>
+              Payments
             </Text>
           </TouchableOpacity>
         </View>
@@ -2529,6 +2576,100 @@ const handleSubmitAssessment = async () => {
           <Ionicons name="document-outline" size={40} color="#ccc" />
         </View>
         <Text style={styles.emptyStateText}>No disbursements available</Text>
+      </View>
+    )}
+  </View>
+)}
+{/* Payments Section */}
+{activeTab === 'Payments' && (
+  <View style={styles.paymentsSection}>
+    {loadingPayments ? (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#4285F4" />
+        <Text style={styles.loadingText}>Loading payments...</Text>
+      </View>
+    ) : payments.length > 0 ? (
+      <>
+        {payments.map((payment, index) => (
+          <View key={payment.id || index} style={styles.paymentCard}>
+            <View style={styles.paymentHeader}>
+              <Text style={styles.paymentRefNo}>{payment.ref_no || 'N/A'}</Text>
+              <Text style={[styles.paymentStatus, 
+                payment.is_allocated === 2 && styles.statusAllocated,
+                payment.is_allocated === 1 && styles.statusPartial,
+                payment.is_allocated === 0 && styles.statusUnallocated,
+              ]}>
+                {payment.is_allocated === 2 ? 'Allocated' : 
+                 payment.is_allocated === 1 ? 'Partial' : 'Unallocated'}
+              </Text>
+            </View>
+            
+            <View style={styles.paymentDetails}>
+              <View style={styles.paymentDetailRow}>
+                <Text style={styles.paymentDetailLabel}>Amount:</Text>
+                <Text style={styles.paymentDetailValue}>
+                  KES {payment.amount?.toLocaleString()}
+                </Text>
+              </View>
+              
+              <View style={styles.paymentDetailRow}>
+                <Text style={styles.paymentDetailLabel}>Date:</Text>
+                <Text style={styles.paymentDetailValue}>
+                  {payment.created_at ? new Date(payment.created_at).toLocaleDateString() : 'N/A'}
+                </Text>
+              </View>
+              
+              {payment.received_by && (
+                <View style={styles.paymentDetailRow}>
+                  <Text style={styles.paymentDetailLabel}>Received By:</Text>
+                  <Text style={styles.paymentDetailValue}>{payment.received_by}</Text>
+                </View>
+              )}
+              
+              {payment.allocations && payment.allocations.length > 0 && (
+                <View style={styles.allocationsSection}>
+                  <Text style={styles.allocationsSectionTitle}>Allocations:</Text>
+                  {payment.allocations.map((allocation, allocIndex) => (
+                    <View key={allocation.id || allocIndex} style={styles.allocationItem}>
+                      <Text style={styles.allocationText}>
+                        • {allocation.description || 'Allocation'}: KES {allocation.amount?.toLocaleString()}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </View>
+          </View>
+        ))}
+        
+        {/* Pagination Controls */}
+        <View style={styles.paginationContainer}>
+          <TouchableOpacity 
+            style={[styles.paginationButton, paymentsPage === 1 && styles.paginationButtonDisabled]}
+            onPress={() => fetchPayments(paymentsPage - 1)}
+            disabled={paymentsPage === 1}
+          >
+            <Text style={styles.paginationButtonText}>Previous</Text>
+          </TouchableOpacity>
+          
+          <Text style={styles.paginationText}>Page {paymentsPage}</Text>
+          
+          <TouchableOpacity 
+            style={[styles.paginationButton, 
+              payments.length < 5 && styles.paginationButtonDisabled]}
+            onPress={() => fetchPayments(paymentsPage + 1)}
+            disabled={payments.length < 5}
+          >
+            <Text style={styles.paginationButtonText}>Next</Text>
+          </TouchableOpacity>
+        </View>
+      </>
+    ) : (
+      <View style={styles.emptyState}>
+        <View style={styles.emptyIconContainer}>
+          <Ionicons name="wallet-outline" size={40} color="#ccc" />
+        </View>
+        <Text style={styles.emptyStateText}>No payments available</Text>
       </View>
     )}
   </View>
@@ -5459,6 +5600,91 @@ customAlertButtonText: {
   fontSize: 16,
   fontWeight: '600',
   textAlign: 'center',
+},
+paymentsSection: {
+  padding: 16,
+},
+paymentCard: {
+  backgroundColor: '#fff',
+  borderRadius: 8,
+  padding: 16,
+  marginBottom: 12,
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.1,
+  shadowRadius: 4,
+  elevation: 3,
+},
+paymentHeader: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  marginBottom: 12,
+  paddingBottom: 12,
+  borderBottomWidth: 1,
+  borderBottomColor: '#f0f0f0',
+},
+paymentRefNo: {
+  fontSize: 16,
+  fontWeight: '600',
+  color: '#333',
+},
+paymentStatus: {
+  fontSize: 12,
+  fontWeight: '600',
+  paddingHorizontal: 8,
+  paddingVertical: 4,
+  borderRadius: 4,
+  backgroundColor: '#e0e0e0',
+  color: '#666',
+},
+statusAllocated: {
+  backgroundColor: '#C8E6C9',
+  color: '#2E7D32',
+},
+statusPartial: {
+  backgroundColor: '#FFF9C4',
+  color: '#F57F17',
+},
+statusUnallocated: {
+  backgroundColor: '#FFCDD2',
+  color: '#C62828',
+},
+paymentDetails: {
+  gap: 8,
+},
+paymentDetailRow: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+},
+paymentDetailLabel: {
+  fontSize: 14,
+  color: '#666',
+},
+paymentDetailValue: {
+  fontSize: 14,
+  fontWeight: '500',
+  color: '#333',
+},
+allocationsSection: {
+  marginTop: 8,
+  paddingTop: 8,
+  borderTopWidth: 1,
+  borderTopColor: '#f0f0f0',
+},
+allocationsSectionTitle: {
+  fontSize: 13,
+  fontWeight: '600',
+  color: '#666',
+  marginBottom: 4,
+},
+allocationItem: {
+  marginTop: 4,
+},
+allocationText: {
+  fontSize: 12,
+  color: '#666',
 },
 });
 

@@ -27,6 +27,7 @@ export default function LoansReportScreen() {
   const [token, setToken] = useState(null);
   const params = useLocalSearchParams();
   const [activeFilter, setActiveFilter] = useState(null);
+  const [dueInDaysFilter, setDueInDaysFilter] = useState(null);
 
   // Fetch token on mount
   useEffect(() => {
@@ -41,14 +42,18 @@ export default function LoansReportScreen() {
   }, [token, currentPage, searchQuery]);
 
   useEffect(() => {
-  if (token && params?.statusFilter !== undefined) {
-    setActiveFilter(params.statusFilter);
-    fetchLoansReport({ status: params.statusFilter });
-  } else if (token) {
-    fetchLoansReport();
-  }
-}, [token, currentPage, params?.statusFilter]);
-
+    if (token && params?.statusFilter !== undefined) {
+      setActiveFilter(params.statusFilter);
+      setDueInDaysFilter(null); 
+      fetchLoansReport({ status: params.statusFilter });
+    } else if (token && params?.dueInDays !== undefined) {
+      setDueInDaysFilter(params.dueInDays);
+      setActiveFilter(null); 
+      fetchLoansReport({ due_in_days: params.dueInDays });
+    } else if (token) {
+      fetchLoansReport();
+    }
+  }, [token, currentPage, params?.statusFilter, params?.dueInDays]);
   const getToken = async () => {
     try {
       const storedToken = await AsyncStorage.getItem('token');
@@ -106,62 +111,71 @@ export default function LoansReportScreen() {
   };
 
   const fetchLoansReport = async (filters = {}) => {
-    setLoading(true);
-    try {
-      let url = `${API_BASE_URL}/api/loans/getpaginatedloans/${currentPage}/20`;
-      
-      // Add status filter if present
-      if (filters.status !== undefined) {
-        url += `?status=${filters.status}`;
-      }
-
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      const result = await response.json();
-      console.log('API Response Sample:', result.payload[0]);
-
-      if (result.success) {
-        const loans = result.payload || [];
-
-        // Format data for table or card display
-        const formattedData = loans.map((loan) => ({
-          id: loan.id,
-          memberId: loan.client_id,
-          name: loan.name || 'N/A',
-          phone: loan.phone || 'N/A',
-          paid: Number(loan.il_amount_paid || 0),
-          balance: Number(loan.il_balance_due || 0),
-          status: loan.status,
-          statusLabel: getStatusLabel(loan.status),
-          statusStyles: getStatusStyles(loan.status),
-          branch: loan.branch?.name || 'N/A',
-          team: loan.team || 'N/A',
-          bde: loan.bde || 'N/A',
-          dueDate: loan.next_due_date
-            ? new Date(loan.next_due_date).toLocaleDateString()
-            : 'N/A',
-        }));
-
-        // Update UI states
-        setData(formattedData);
-        setTotalPages(Math.ceil(result.all_items_total / 20));
-        setTotalLoans(result.additional_data?.summary?.total_no_of_loans || 0);
-      } else {
-        Alert.alert('Error', result.error || 'Failed to fetch loans report');
-      }
-    } catch (error) {
-      console.error('Error fetching loans report:', error);
-      Alert.alert('Error', 'Failed to fetch loans report. Please try again.');
-    } finally {
-      setLoading(false);
+  setLoading(true);
+  try {
+    
+    const requestBody = {};
+    
+    
+    if (filters.status !== undefined) {
+      requestBody.status = filters.status;
     }
-  };
+    
+    
+    if (filters.due_in_days !== undefined) {
+      requestBody.due_in_days = filters.due_in_days;
+    }
+
+    const url = `${API_BASE_URL}/api/loans/getpaginatedloans/${currentPage}/20`;
+    
+    const response = await fetch(url, {
+      method: 'POST', 
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    const result = await response.json();
+    console.log('API Response Sample:', result.payload[0]);
+
+    if (result.success) {
+      const loans = result.payload || [];
+
+      
+      const formattedData = loans.map((loan) => ({
+        id: loan.id,
+        memberId: loan.client_id,
+        name: loan.name || 'N/A',
+        phone: loan.phone || 'N/A',
+        paid: Number(loan.il_amount_paid || 0),
+        balance: Number(loan.il_balance_due || 0),
+        status: loan.status,
+        statusLabel: getStatusLabel(loan.status),
+        statusStyles: getStatusStyles(loan.status),
+        branch: loan.branch?.name || 'N/A',
+        team: loan.team || 'N/A',
+        bde: loan.bde || 'N/A',
+        dueDate: loan.next_due_date
+          ? new Date(loan.next_due_date).toLocaleDateString()
+          : 'N/A',
+      }));
+
+      
+      setData(formattedData);
+      setTotalPages(Math.ceil(result.all_items_total / 20));
+      setTotalLoans(result.additional_data?.summary?.total_no_of_loans || 0);
+    } else {
+      Alert.alert('Error', result.error || 'Failed to fetch loans report');
+    }
+  } catch (error) {
+    console.error('Error fetching loans report:', error);
+    Alert.alert('Error', 'Failed to fetch loans report. Please try again.');
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleSearch = () => {
     setCurrentPage(1);
@@ -202,7 +216,7 @@ export default function LoansReportScreen() {
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => router.push("/actions")} // 👈 navigate back to actions.jsx
+          onPress={() => router.push("/actions")} 
         >
           <Ionicons name="arrow-back" size={24} color="white" />
         </TouchableOpacity>
@@ -210,14 +224,18 @@ export default function LoansReportScreen() {
         <Text style={styles.headerTitle}>Loans Report</Text>
       </View>
 
-      {activeFilter !== null && (
+      {(activeFilter !== null || dueInDaysFilter !== null) && (
         <View style={styles.filterBanner}>
           <Text style={styles.filterText}>
-            Showing: {params?.filterLabel || getStatusLabel(activeFilter)}
+            {activeFilter !== null 
+              ? (params?.filterLabel || getStatusLabel(activeFilter))
+              : `Loans Due in ${dueInDaysFilter} Days`
+            }
           </Text>
           <TouchableOpacity 
             onPress={() => {
               setActiveFilter(null);
+              setDueInDaysFilter(null);
               router.replace('/loan_summary');
             }} 
             style={styles.clearFilterButton}
