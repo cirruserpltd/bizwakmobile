@@ -1869,11 +1869,11 @@ const handleReceivePayment = async () => {
       throw new Error(result.error || 'Failed to process payment');
     }
 
-    // ✅ CHANGED: Update to Dormant instead of Active after membership fee payment
+    
     if (isMembershipFeePayment) {
       setCustomer(prev => ({
         ...prev,
-        status: 'Dormant',  // ✅ This will map to status 10 in backend
+        status: 'Dormant',  
       }));
       Alert.alert(
         'Success', 
@@ -1889,7 +1889,6 @@ const handleReceivePayment = async () => {
     setTransactionType('');
     setAllocatedPayments([{ type: '', amount: '' }]);
     
-    // ✅ Refresh customer profile to get updated status from backend
     await fetchCustomerProfile();
     await fetchLoanSummaryData();
     
@@ -1945,10 +1944,10 @@ const handleSubmitAssessment = async () => {
         'Please enter at least one business type by typing and selecting from the suggestions.',
         [{ text: 'OK' }]
       );
-      return; // STOP HERE - don't submit
+      return; 
     }
 
-    // ✅ CHECK 2: All business types must match API data
+    
     const invalidBusinessTypes = filledBusinessTypes.filter(bt => {
       return !businessTypeOptions.includes(bt);
     });
@@ -1959,7 +1958,7 @@ const handleSubmitAssessment = async () => {
         `These business types are not valid:\n\n"${invalidBusinessTypes.join('"\n"')}"\n\nYou must select from the dropdown suggestions that appear as you type. If no suggestions appear, that business type is not in our system.`,
         [{ text: 'OK' }]
       );
-      return; // STOP HERE - don't submit
+      return; 
     }
     const token = await AsyncStorage.getItem('token');
     
@@ -2590,73 +2589,70 @@ const handleSubmitAssessment = async () => {
       </View>
     ) : payments.length > 0 ? (
       <>
-        {payments.map((payment, index) => (
-          <View key={payment.id || index} style={styles.paymentCard}>
-            <View style={styles.paymentHeader}>
-              <Text style={styles.paymentRefNo}>{payment.ref_no || 'N/A'}</Text>
-              <Text style={[styles.paymentStatus, 
-                payment.is_allocated === 2 && styles.statusAllocated,
-                payment.is_allocated === 1 && styles.statusPartial,
-                payment.is_allocated === 0 && styles.statusUnallocated,
-              ]}>
-                {payment.is_allocated === 2 ? 'Allocated' : 
-                 payment.is_allocated === 1 ? 'Partial' : 'Unallocated'}
-              </Text>
-            </View>
-            
-            <View style={styles.paymentDetails}>
-              <View style={styles.paymentDetailRow}>
-                <Text style={styles.paymentDetailLabel}>Amount:</Text>
-                <Text style={styles.paymentDetailValue}>
-                  KES {payment.amount?.toLocaleString()}
-                </Text>
-              </View>
-              
-              <View style={styles.paymentDetailRow}>
-                <Text style={styles.paymentDetailLabel}>Date:</Text>
-                <Text style={styles.paymentDetailValue}>
-                  {payment.created_at ? new Date(payment.created_at).toLocaleDateString() : 'N/A'}
-                </Text>
-              </View>
-              
-              {payment.received_by && (
-                <View style={styles.paymentDetailRow}>
-                  <Text style={styles.paymentDetailLabel}>Received By:</Text>
-                  <Text style={styles.paymentDetailValue}>{payment.received_by}</Text>
-                </View>
-              )}
-              
-              {payment.allocations && payment.allocations.length > 0 && (
-                <View style={styles.allocationsSection}>
-                  <Text style={styles.allocationsSectionTitle}>Allocations:</Text>
-                  {payment.allocations.map((allocation, allocIndex) => (
-                    <View key={allocation.id || allocIndex} style={styles.allocationItem}>
-                      <Text style={styles.allocationText}>
-                        • {allocation.description || 'Allocation'}: KES {allocation.amount?.toLocaleString()}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-              )}
-            </View>
+        {/* Table */}
+        <View style={styles.paymentTable}>
+          {/* Table Header */}
+          <View style={styles.paymentTableHeader}>
+            <Text style={[styles.paymentTableHeaderCell, styles.colDate]}>Date</Text>
+            <Text style={[styles.paymentTableHeaderCell, styles.colAmount]}>Amount</Text>
+            <Text style={[styles.paymentTableHeaderCell, styles.colStatus]}>Status</Text>
           </View>
-        ))}
-        
+
+          {/* Table Rows */}
+          {payments.map((payment, index) => (
+            <View
+              key={payment.id || index}
+              style={[
+                styles.paymentTableRow,
+                index % 2 === 0 && styles.paymentTableRowEven,
+              ]}
+            >
+              <Text style={[styles.paymentTableCell, styles.colDate]}>
+                {payment.created_at
+                  ? new Date(payment.created_at).toLocaleDateString('en-GB', {
+                      day: '2-digit',
+                      month: '2-digit',
+                      year: 'numeric',
+                    })
+                  : 'N/A'}
+              </Text>
+              <Text style={[styles.paymentTableCell, styles.colAmount]}>
+                KES {payment.amount?.toLocaleString() ?? '0'}
+              </Text>
+              <View style={[styles.colStatus, { justifyContent: 'center', alignItems: 'center' }]}>
+                <Text
+                  style={[
+                    styles.paymentStatusBadge,
+                    payment.is_allocated === 2 && styles.statusAllocated,
+                    payment.is_allocated === 1 && styles.statusPartial,
+                    payment.is_allocated === 0 && styles.statusUnallocated,
+                  ]}
+                >
+                  {payment.is_allocated === 2
+                    ? 'Allocated'
+                    : payment.is_allocated === 1
+                    ? 'Partial'
+                    : 'Unallocated'}
+                </Text>
+              </View>
+            </View>
+          ))}
+        </View>
+
         {/* Pagination Controls */}
         <View style={styles.paginationContainer}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.paginationButton, paymentsPage === 1 && styles.paginationButtonDisabled]}
             onPress={() => fetchPayments(paymentsPage - 1)}
             disabled={paymentsPage === 1}
           >
             <Text style={styles.paginationButtonText}>Previous</Text>
           </TouchableOpacity>
-          
+
           <Text style={styles.paginationText}>Page {paymentsPage}</Text>
-          
-          <TouchableOpacity 
-            style={[styles.paginationButton, 
-              payments.length < 5 && styles.paginationButtonDisabled]}
+
+          <TouchableOpacity
+            style={[styles.paginationButton, payments.length < 5 && styles.paginationButtonDisabled]}
             onPress={() => fetchPayments(paymentsPage + 1)}
             disabled={payments.length < 5}
           >
@@ -5685,6 +5681,64 @@ allocationItem: {
 allocationText: {
   fontSize: 12,
   color: '#666',
+},
+// --- Payment Table ---
+paymentTable: {
+  backgroundColor: '#fff',
+  borderRadius: 8,
+  overflow: 'hidden',
+  borderWidth: 1,
+  borderColor: '#e0e0e0',
+  marginBottom: 16,
+},
+paymentTableHeader: {
+  flexDirection: 'row',
+  backgroundColor: '#4285F4',
+  paddingVertical: 10,
+  paddingHorizontal: 8,
+},
+paymentTableHeaderCell: {
+  fontSize: 13,
+  fontWeight: '700',
+  color: '#fff',
+  textTransform: 'uppercase',
+},
+paymentTableRow: {
+  flexDirection: 'row',
+  paddingVertical: 12,
+  paddingHorizontal: 8,
+  borderBottomWidth: 1,
+  borderBottomColor: '#f0f0f0',
+  alignItems: 'center',
+},
+paymentTableRowEven: {
+  backgroundColor: '#f9fbff',
+},
+paymentTableCell: {
+  fontSize: 13,
+  color: '#333',
+},
+paymentStatusBadge: {
+  fontSize: 11,
+  fontWeight: '600',
+  paddingHorizontal: 8,
+  paddingVertical: 3,
+  borderRadius: 12,
+  overflow: 'hidden',
+  backgroundColor: '#e0e0e0',
+  color: '#666',
+  textAlign: 'center',
+},
+
+colDate: {
+  flex: 2,
+},
+colAmount: {
+  flex: 2,
+},
+colStatus: {
+  flex: 1.5,
+  flexDirection: 'row',
 },
 });
 

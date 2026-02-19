@@ -16,7 +16,7 @@ export default {
     },
     android: {
       package: "com.bizwak.app",
-      versionCode: 18,
+      versionCode: 19,
       adaptiveIcon: {
         foregroundImage: "./assets/adaptive-icon.png",
         backgroundColor: "#ffffff"

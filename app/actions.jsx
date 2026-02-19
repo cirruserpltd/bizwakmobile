@@ -780,7 +780,7 @@ const fetchRequestSummary = async (token) => {
             onPress={handleLoansDuePress}
             activeOpacity={0.7}
           >
-            <Ionicons name="time-outline" size={18} color="#FF9800" />
+            <Ionicons name="time-outline" size={18} color="#E53935" />
             <Text style={styles.loansDueButtonText}>Loans</Text>
           </TouchableOpacity>
         </View>
@@ -1254,19 +1254,19 @@ const styles = StyleSheet.create({
   loansDueButton: {
   flexDirection: 'row',
   alignItems: 'center',
-  backgroundColor: '#FFF3E0',
+  backgroundColor: '#FFEBEE',
   paddingHorizontal: 12,
   paddingVertical: 8,
   borderRadius: 12,
   borderWidth: 1,
-  borderColor: '#FF9800',
+  borderColor: '#E53935',
   marginTop: 12,
   alignSelf: 'flex-start',
 },
 loansDueButtonText: {
   fontSize: 12,
   fontWeight: '600',
-  color: '#FF9800',
+  color: '#E53935',
   marginLeft: 6,
 },
   
