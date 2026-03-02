@@ -58,6 +58,10 @@ export default function HomeScreen() {
   const [dateFilter, setDateFilter] = useState('mtd');
   const [showFilterMenu, setShowFilterMenu] = useState(false);
 
+  const [kpiTeamsData, setKpiTeamsData] = useState(null);
+  const [kpiTeamsLoading, setKpiTeamsLoading] = useState(true);
+  const [kpiTeamsError, setKpiTeamsError] = useState(null);
+
   useEffect(() => {
     const today = new Date();
     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -79,6 +83,7 @@ export default function HomeScreen() {
     fetchLoansSummary();
     fetchInstallmentsSummary();
     fetchPaymentsSummary();
+    fetchKpiTeams();
   }, []);
 
   useEffect(() => {
@@ -103,7 +108,8 @@ export default function HomeScreen() {
       fetchCustomerSummary(),
       fetchLoansSummary(),
       fetchInstallmentsSummary(),
-      fetchPaymentsSummary()
+      fetchPaymentsSummary(),
+      fetchKpiTeams()
     ]);
     setRefreshing(false);
   };
@@ -204,6 +210,56 @@ export default function HomeScreen() {
       setError('Network error. Please try again.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchKpiTeams = async () => {
+    try {
+      setKpiTeamsLoading(true);
+      setKpiTeamsError(null);
+      const token = await AsyncStorage.getItem("token");
+      const now = new Date();
+      const month = now.getMonth() + 1;
+      const year = now.getFullYear();
+      const response = await fetch(
+        `${API_BASE_URL}/api/dashboard/kpi/teams?month=${month}&year=${year}`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          credentials: 'include',
+        }
+      );
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const result = await response.json();
+      if (result.success && result.payload) {
+        const branches = result.payload.data || [];
+
+        // Mirror exactly what the web app does
+        const totals = branches.reduce((acc, branch) => {
+          const bt = branch.branch_totals || {};
+          acc.collection += bt.collection ?? 0;
+          acc.expected   += bt.expected   ?? 0;
+          return acc;
+        }, { collection: 0, expected: 0 });
+
+        const grandTotalCollectionPercentage = totals.expected > 0
+          ? (totals.collection / totals.expected) * 100
+          : 0;
+
+        setKpiTeamsData({
+          branches,
+          grand_total_collection_percentage: grandTotalCollectionPercentage,
+        });
+      } else {
+        setKpiTeamsError(result.error || 'Failed to fetch KPI data');
+      }
+    } catch (err) {
+      setKpiTeamsError(err.message || 'Network error');
+    } finally {
+      setKpiTeamsLoading(false);
     }
   };
 
@@ -891,10 +947,21 @@ const calculateTotal = (groupedData) => {
       <View style={styles.updateCardsContainer}>
         {/* Collections Card */}
         <View style={[styles.updateCard, { backgroundColor: '#4CAF50' }]}>
-          <View style={[styles.updateCardIconContainer, { backgroundColor: '#66BB6A' }]}>
-            <Ionicons name="trending-up" size={22} color="white" />
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <View style={[styles.updateCardIconContainer, { backgroundColor: '#66BB6A', marginBottom: 0 }]}>
+              <Ionicons name="trending-up" size={22} color="white" />
+            </View>
+            {kpiTeamsLoading ? (
+              <ActivityIndicator size="small" color="white" />
+            ) : kpiTeamsData ? (
+              <View style={styles.collectionRateBadge}>
+                <Text style={styles.collectionRateText}>
+                  {(kpiTeamsData?.grand_total_collection_percentage || 0).toFixed(1)}%
+                </Text>
+                <Text style={styles.collectionRateLabel}>Collection</Text>
+              </View>
+            ) : null}
           </View>
-          <Text style={styles.updateCardTitle}>Collections</Text>
           
           {collectionsLoading ? (
             <ActivityIndicator size="small" color="white" style={styles.updateCardLoader} />
@@ -1813,6 +1880,26 @@ summaryLabel: {
   color: '#757575',
   textAlign: 'center',
   fontWeight: '500',
+},
+collectionRateBadge: {
+  backgroundColor: 'rgba(255,255,255,0.2)',
+  borderRadius: 10,
+  paddingHorizontal: 10,
+  paddingVertical: 6,
+  alignItems: 'center',
+  borderWidth: 1,
+  borderColor: 'rgba(255,255,255,0.3)',
+},
+collectionRateText: {
+  fontSize: 16,
+  fontWeight: '700',
+  color: 'white',
+},
+collectionRateLabel: {
+  fontSize: 9,
+  color: 'rgba(255,255,255,0.85)',
+  fontWeight: '500',
+  marginTop: 1,
 },
   
 });
