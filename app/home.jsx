@@ -214,54 +214,74 @@ export default function HomeScreen() {
   };
 
   const fetchKpiTeams = async () => {
-    try {
-      setKpiTeamsLoading(true);
-      setKpiTeamsError(null);
-      const token = await AsyncStorage.getItem("token");
-      const now = new Date();
-      const month = now.getMonth() + 1;
-      const year = now.getFullYear();
-      const response = await fetch(
-        `${API_BASE_URL}/api/dashboard/kpi/teams?month=${month}&year=${year}`,
-        {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          credentials: 'include',
-        }
-      );
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const result = await response.json();
-      if (result.success && result.payload) {
-        const branches = result.payload.data || [];
+  try {
+    setKpiTeamsLoading(true);
+    setKpiTeamsError(null);
+    const token = await AsyncStorage.getItem("token");
 
-        // Mirror exactly what the web app does
-        const totals = branches.reduce((acc, branch) => {
-          const bt = branch.branch_totals || {};
-          acc.collection += bt.collection ?? 0;
-          acc.expected   += bt.expected   ?? 0;
-          return acc;
-        }, { collection: 0, expected: 0 });
+    const now = new Date();
+    const currentMonth = now.getMonth() + 1;
+    const currentYear = now.getFullYear();
 
-        const grandTotalCollectionPercentage = totals.expected > 0
-          ? (totals.collection / totals.expected) * 100
-          : 0;
+    // Calculate previous month/year
+    const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const prevMonth = prevDate.getMonth() + 1;
+    const prevYear = prevDate.getFullYear();
 
-        setKpiTeamsData({
-          branches,
-          grand_total_collection_percentage: grandTotalCollectionPercentage,
-        });
-      } else {
-        setKpiTeamsError(result.error || 'Failed to fetch KPI data');
-      }
-    } catch (err) {
-      setKpiTeamsError(err.message || 'Network error');
-    } finally {
-      setKpiTeamsLoading(false);
+    const headers = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    };
+
+    const [currentRes, prevRes] = await Promise.all([
+      fetch(`${API_BASE_URL}/api/dashboard/kpi/teams?month=${currentMonth}&year=${currentYear}`, {
+        method: 'GET', headers, credentials: 'include',
+      }),
+      fetch(`${API_BASE_URL}/api/dashboard/kpi/teams?month=${prevMonth}&year=${prevYear}`, {
+        method: 'GET', headers, credentials: 'include',
+      }),
+    ]);
+
+    if (!currentRes.ok) throw new Error(`HTTP ${currentRes.status}`);
+    if (!prevRes.ok) throw new Error(`HTTP ${prevRes.status}`);
+
+    const [currentResult, prevResult] = await Promise.all([
+      currentRes.json(),
+      prevRes.json(),
+    ]);
+
+    const calcPercentage = (payload) => {
+      const branches = payload?.data || [];
+      const totals = branches.reduce((acc, branch) => {
+        const bt = branch.branch_totals || {};
+        acc.collection += bt.collection ?? 0;
+        acc.expected   += bt.expected   ?? 0;
+        return acc;
+      }, { collection: 0, expected: 0 });
+      return totals.expected > 0 ? (totals.collection / totals.expected) * 100 : 0;
+    };
+
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+    if (currentResult.success && currentResult.payload) {
+      setKpiTeamsData({
+        branches: currentResult.payload.data || [],
+        grand_total_collection_percentage: calcPercentage(currentResult.payload),
+        current_month_label: months[currentMonth - 1],
+        prev_month_percentage: prevResult.success && prevResult.payload
+          ? calcPercentage(prevResult.payload)
+          : null,
+        prev_month_label: months[prevMonth - 1],
+      });
+    } else {
+      setKpiTeamsError(currentResult.error || 'Failed to fetch KPI data');
     }
-  };
+  } catch (err) {
+    setKpiTeamsError(err.message || 'Network error');
+  } finally {
+    setKpiTeamsLoading(false);
+  }
+};
 
   const fetchCustomerSummary = async () => {
     try {
@@ -948,20 +968,31 @@ const calculateTotal = (groupedData) => {
         {/* Collections Card */}
         <View style={[styles.updateCard, { backgroundColor: '#4CAF50' }]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-            <View style={[styles.updateCardIconContainer, { backgroundColor: '#66BB6A', marginBottom: 0 }]}>
-              <Ionicons name="trending-up" size={22} color="white" />
-            </View>
+            
             {kpiTeamsLoading ? (
               <ActivityIndicator size="small" color="white" />
             ) : kpiTeamsData ? (
-              <View style={styles.collectionRateBadge}>
-                <Text style={styles.collectionRateText}>
-                  {(kpiTeamsData?.grand_total_collection_percentage || 0).toFixed(1)}%
-                </Text>
-                <Text style={styles.collectionRateLabel}>Collection</Text>
+              <View style={{ flexDirection: 'row', gap: 6 }}>
+                {/* Previous month badge */}
+                {kpiTeamsData.prev_month_percentage !== null && (
+                  <View style={[styles.collectionRateBadge, { backgroundColor: 'rgba(255,255,255,0.15)' }]}>
+                    <Text style={styles.collectionRateText}>
+                      {(kpiTeamsData.prev_month_percentage || 0).toFixed(1)}%
+                    </Text>
+                    <Text style={styles.collectionRateLabel}>{kpiTeamsData.prev_month_label}</Text>
+                  </View>
+                )}
+                {/* Current month badge */}
+                <View style={styles.collectionRateBadge}>
+                  <Text style={styles.collectionRateText}>
+                    {(kpiTeamsData.grand_total_collection_percentage || 0).toFixed(1)}%
+                  </Text>
+                  <Text style={styles.collectionRateLabel}>{kpiTeamsData.current_month_label}</Text>
+                </View>
               </View>
-            ) : null}
+          ) : null}
           </View>
+          <Text style={styles.updateCardTitle}>Collections</Text>
           
           {collectionsLoading ? (
             <ActivityIndicator size="small" color="white" style={styles.updateCardLoader} />

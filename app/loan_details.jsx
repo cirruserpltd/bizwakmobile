@@ -36,6 +36,9 @@ const LoanDetails = () => {
   const [currentUserName, setCurrentUserName] = useState('');
   const [declineModalVisible, setDeclineModalVisible] = useState(false);
   const [declineReason, setDeclineReason] = useState('');
+  const [payments, setPayments] = useState([]);
+  const [loadingPayments, setLoadingPayments] = useState(false);
+  const [paymentsPage, setPaymentsPage] = useState(1);
   
 
 
@@ -169,6 +172,7 @@ const fetchCurrentUser = async () => {
         active: data.payload,
         previous: previousLoans,
       });
+      await fetchLoanPayments(data.payload.id);
     } else {
       Alert.alert('Error', data.error || 'No loans found');
       setLoan(null);
@@ -178,6 +182,35 @@ const fetchCurrentUser = async () => {
     Alert.alert('Error', 'Failed to fetch loan details');
   } finally {
     setLoading(false);
+  }
+};
+
+const fetchLoanPayments = async (loanId, page = 1) => {
+  if (!loanId) return;
+  try {
+    setLoadingPayments(true);
+    const token = await AsyncStorage.getItem('token');
+    const response = await fetch(
+      `${API_BASE_URL}/api/payments/${member_id}?page=${page}&per_page=10`,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+    const data = await response.json();
+    if (data.success && data.payload) {
+      setPayments(data.payload);
+      setPaymentsPage(page);
+    } else {
+      setPayments([]);
+    }
+  } catch (error) {
+    console.error('Error fetching loan payments:', error);
+    setPayments([]);
+  } finally {
+    setLoadingPayments(false);
   }
 };
 
@@ -630,15 +663,80 @@ const submitDecline = async () => {
 
         {/* Payments */}
         <View style={[styles.card, { marginBottom: 20 }]}>
-          <Text style={styles.sectionTitle}>Payments (0)</Text>
-          <View style={styles.emptyPayments}>
-            <View style={styles.emptyPaymentsIcon}>
-              <Ionicons name="wallet-outline" size={48} color="#FFC107" />
+          <Text style={styles.sectionTitle}>Payments ({payments.length})</Text>
+
+          {loadingPayments ? (
+            <ActivityIndicator size="small" color="#4285F4" />
+          ) : payments.length > 0 ? (
+            <>
+              {/* Table Header */}
+              <View style={styles.paymentTableHeader}>
+                <Text style={[styles.paymentTableHeaderCell, styles.colDate]}>Date</Text>
+                <Text style={[styles.paymentTableHeaderCell, styles.colAmount]}>Amount</Text>
+                <Text style={[styles.paymentTableHeaderCell, styles.colStatus]}>Status</Text>
+              </View>
+
+              {/* Table Rows */}
+              {payments.map((payment, index) => (
+                <View
+                  key={payment.id || index}
+                  style={[
+                    styles.paymentTableRow,
+                    index % 2 === 0 && styles.paymentTableRowEven,
+                  ]}
+                >
+                  <Text style={[styles.paymentTableCell, styles.colDate]}>
+                    {payment.created_at
+                      ? new Date(payment.created_at).toLocaleDateString('en-GB', {
+                          day: '2-digit', month: '2-digit', year: 'numeric',
+                        })
+                      : 'N/A'}
+                  </Text>
+                  <Text style={[styles.paymentTableCell, styles.colAmount]}>
+                    KES {payment.amount?.toLocaleString() ?? '0'}
+                  </Text>
+                  <View style={[styles.colStatus, { justifyContent: 'center' }]}>
+                    <Text style={[
+                      styles.paymentStatusBadge,
+                      payment.is_allocated === 2 && styles.statusAllocated,
+                      payment.is_allocated === 1 && styles.statusPartial,
+                      payment.is_allocated === 0 && styles.statusUnallocated,
+                    ]}>
+                      {payment.is_allocated === 2 ? 'Allocated'
+                        : payment.is_allocated === 1 ? 'Partial'
+                        : 'Unallocated'}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+
+              {/* Pagination */}
+              <View style={styles.paginationContainer}>
+                <TouchableOpacity
+                  style={[styles.paginationButton, paymentsPage === 1 && styles.paginationButtonDisabled]}
+                  onPress={() => fetchLoanPayments(activeLoan?.id, paymentsPage - 1)}
+                  disabled={paymentsPage === 1}
+                >
+                  <Text style={styles.paginationButtonText}>Previous</Text>
+                </TouchableOpacity>
+                <Text style={styles.paginationText}>Page {paymentsPage}</Text>
+                <TouchableOpacity
+                  style={[styles.paginationButton, payments.length < 10 && styles.paginationButtonDisabled]}
+                  onPress={() => fetchLoanPayments(activeLoan?.id, paymentsPage + 1)}
+                  disabled={payments.length < 10}
+                >
+                  <Text style={styles.paginationButtonText}>Next</Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          ) : (
+            <View style={styles.emptyPayments}>
+              <View style={styles.emptyPaymentsIcon}>
+                <Ionicons name="wallet-outline" size={48} color="#FFC107" />
+              </View>
+              <Text style={styles.emptyPaymentsText}>No payments made towards this loan.</Text>
             </View>
-            <Text style={styles.emptyPaymentsText}>
-              No payments made towards this loan.
-            </Text>
-          </View>
+          )}
         </View>
 
         {/* Previous Loans Section */}
@@ -649,7 +747,7 @@ const submitDecline = async () => {
               <TouchableOpacity
                 key={index}
                 style={styles.detailRow}
-                onPress={() => router.push(`/loan_details/${prevLoan.id}`)}
+                onPress={() => router.push(`/loan_details?loan_id=${prevLoan.id}&member_id=${member_id}`)}
               >
                 <Text style={styles.detailLabel}>
                   {prevLoan.product_name || 'Unknown Product'}
@@ -1580,6 +1678,66 @@ modalDeclineButtonText: {
   fontWeight: '600',
   letterSpacing: 0.5,
 },
+paymentTableHeader: {
+  flexDirection: 'row',
+  backgroundColor: '#2196F3',
+  paddingVertical: 10,
+  paddingHorizontal: 8,
+  borderRadius: 4,
+  marginBottom: 4,
+},
+paymentTableHeaderCell: {
+  fontSize: 13,
+  fontWeight: '700',
+  color: '#fff',
+},
+paymentTableRow: {
+  flexDirection: 'row',
+  paddingVertical: 10,
+  paddingHorizontal: 8,
+  borderBottomWidth: 1,
+  borderBottomColor: '#f0f0f0',
+  alignItems: 'center',
+},
+paymentTableRowEven: {
+  backgroundColor: '#f9fbff',
+},
+paymentTableCell: {
+  fontSize: 13,
+  color: '#333',
+},
+paymentStatusBadge: {
+  fontSize: 11,
+  fontWeight: '600',
+  paddingHorizontal: 8,
+  paddingVertical: 3,
+  borderRadius: 12,
+  overflow: 'hidden',
+  backgroundColor: '#e0e0e0',
+  color: '#666',
+  textAlign: 'center',
+},
+statusAllocated: { backgroundColor: '#C8E6C9', color: '#2E7D32' },
+statusPartial: { backgroundColor: '#FFF9C4', color: '#F57F17' },
+statusUnallocated: { backgroundColor: '#FFCDD2', color: '#C62828' },
+colDate: { flex: 2 },
+colAmount: { flex: 2 },
+colStatus: { flex: 1.5, flexDirection: 'row' },
+paginationContainer: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  marginTop: 16,
+},
+paginationButton: {
+  backgroundColor: '#2196F3',
+  paddingHorizontal: 16,
+  paddingVertical: 8,
+  borderRadius: 6,
+},
+paginationButtonDisabled: { backgroundColor: '#ccc' },
+paginationButtonText: { color: '#fff', fontSize: 14, fontWeight: '600' },
+paginationText: { fontSize: 14, color: '#666' },
 });
 
 export default LoanDetails;

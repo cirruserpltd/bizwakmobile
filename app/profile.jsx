@@ -665,32 +665,32 @@ useEffect(() => {
             setHasPendingRequest(true);
             setPendingRequestId(activeRequest.id);
             setHasApprovedRequest(false);
-            console.log('✅ State: Pending Approval');
+            console.log('State: Pending Approval');
           } else if (requestStatus === 1) {
             // Approved, ready for loan creation
             setHasPendingRequest(false);
             setHasApprovedRequest(true);
             setPendingRequestId(activeRequest.id);
-            console.log('✅ State: Approved, Ready for Loan Creation');
+            console.log('State: Approved, Ready for Loan Creation');
           } else {
             // Some other status (processed, rejected, etc.)
             setHasPendingRequest(false);
             setHasApprovedRequest(false);
             setPendingRequestId(null);
-            console.log('❌ State: No active request (status:', requestStatus, ')');
+            //console.log('State: No active request (status:', requestStatus, ')');
           }
         } else {
           // No requests without loans
           setHasPendingRequest(false);
           setHasApprovedRequest(false);
           setPendingRequestId(null);
-          console.log('❌ No requests found without loans');
+          //console.log(' No requests found without loans');
         }
       } else {
         setHasPendingRequest(false);
         setHasApprovedRequest(false);
         setPendingRequestId(null);
-        console.log('❌ No requests in payload');
+       // console.log('No requests in payload');
       }
     } else {
       setHasPendingRequest(false);
@@ -1057,13 +1057,23 @@ const calculateLoanSummary = () => {
     };
   }
 
+   console.log('All loans with statuses:', loans.map(l => ({ 
+    id: l.id, 
+    status: l.status, 
+    outstanding_balance: l.outstanding_balance,
+    next_due_date: l.next_due_date 
+  })));
+
   // Get latest disbursement and nearest due date from loans
   const disbursedLoans = loans.filter(loan => loan.disbursed_at);
   const latestDisbursement = disbursedLoans.length > 0
     ? new Date(Math.max(...disbursedLoans.map(loan => new Date(loan.disbursed_at))))
     : null;
 
-  const loansWithDueDate = loans.filter(loan => loan.next_due_date);
+  const loansWithDueDate = loans.filter(loan => 
+    loan.next_due_date && 
+    loan.outstanding_balance > 0
+  );
   const nearestDueDate = loansWithDueDate.length > 0
     ? new Date(Math.min(...loansWithDueDate.map(loan => new Date(loan.next_due_date))))
     : null;
