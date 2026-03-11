@@ -9,12 +9,19 @@ import {
   StatusBar,
   ActivityIndicator,
   Alert,
+  Modal,
+  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import Constants from 'expo-constants';
 const { API_BASE_URL } = Constants.expoConfig.extra;
+
+const MONTHS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'
+];
 
 export default function LoansReportScreen() {
   const router = useRouter();
@@ -29,30 +36,37 @@ export default function LoansReportScreen() {
   const [activeFilter, setActiveFilter] = useState(null);
   const [dueInDaysFilter, setDueInDaysFilter] = useState(null);
 
-  // Fetch token on mount
+  const now = new Date();
+  const [selectedMonth, setSelectedMonth] = useState(null); // null = any month
+  const [selectedYear, setSelectedYear] = useState(now.getFullYear()); // default to current year
+  const [tempMonth, setTempMonth] = useState(null);
+  const [tempYear, setTempYear] = useState(now.getFullYear());
+  const [showFilterModal, setShowFilterModal] = useState(false);
+
+  const currentYear = now.getFullYear();
+  const years = Array.from({ length: 8 }, (_, i) => currentYear - 5 + i);
+
   useEffect(() => {
     getToken();
   }, []);
 
-  // Fetch data when token, page, or search changes
- useEffect(() => {
-  if (!token) return;
+  useEffect(() => {
+    if (!token) return;
 
-  // Build filters from params
-  if (params?.statusFilter !== undefined && params.statusFilter !== null) {
-    setActiveFilter(params.statusFilter);
-    setDueInDaysFilter(null);
-    fetchLoansReport({ status: params.statusFilter });
-  } else if (params?.dueInDays !== undefined && params.dueInDays !== null) {
-    setDueInDaysFilter(params.dueInDays);
-    setActiveFilter(null);
-    fetchLoansReport({ due_in_days: params.dueInDays });
-  } else {
-    setActiveFilter(null);
-    setDueInDaysFilter(null);
-    fetchLoansReport();
-  }
-}, [token, currentPage, searchQuery, params?.statusFilter, params?.dueInDays]);
+    if (params?.statusFilter !== undefined && params.statusFilter !== null) {
+      setActiveFilter(params.statusFilter);
+      setDueInDaysFilter(null);
+      fetchLoansReport({ status: params.statusFilter });
+    } else if (params?.dueInDays !== undefined && params.dueInDays !== null) {
+      setDueInDaysFilter(params.dueInDays);
+      setActiveFilter(null);
+      fetchLoansReport({ due_in_days: params.dueInDays });
+    } else {
+      setActiveFilter(null);
+      setDueInDaysFilter(null);
+      fetchLoansReport();
+    }
+  }, [token, currentPage, searchQuery, params?.statusFilter, params?.dueInDays, selectedMonth, selectedYear]);
 
   const getToken = async () => {
     try {
@@ -85,7 +99,6 @@ export default function LoansReportScreen() {
 
   const getStatusStyles = (statusCode) => {
     const statusLabel = getStatusLabel(statusCode);
-    
     switch (statusLabel) {
       case 'Rejected':
         return { badge: { backgroundColor: '#FFEBEE' }, text: { color: '#D32F2F' } };
@@ -111,71 +124,76 @@ export default function LoansReportScreen() {
   };
 
   const fetchLoansReport = async (filters = {}) => {
-  setLoading(true);
-  try {
-    
-    const requestBody = {};
-    
-    
-    if (filters.status !== undefined) {
-      requestBody.status = filters.status;
+    setLoading(true);
+    try {
+      const requestBody = {};
+
+      if (filters.status !== undefined) {
+        requestBody.status = filters.status;
+      }
+      if (filters.due_in_days !== undefined) {
+        requestBody.due_in_days = filters.due_in_days;
+      }
+
+      // disbursed_at is returned in each loan object and filtered after fetch
+
+      const url = `${API_BASE_URL}/api/loans/getpaginatedloans/${currentPage}/20`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      const result = await response.json();
+      console.log('API Response Sample:', result.payload[0]);
+
+      if (result.success) {
+        const loans = result.payload || [];
+        const formattedData = loans.map((loan) => ({
+          id: loan.id,
+          memberId: loan.client_id,
+          name: loan.name || 'N/A',
+          phone: loan.phone || 'N/A',
+          paid: Number(loan.il_amount_paid || 0),
+          balance: Number(loan.il_balance_due || 0),
+          status: loan.status,
+          statusLabel: getStatusLabel(loan.status),
+          statusStyles: getStatusStyles(loan.status),
+          branch: loan.branch?.name || 'N/A',
+          team: loan.team || 'N/A',
+          bde: loan.bde || 'N/A',
+          dueDate: loan.next_due_date
+            ? new Date(loan.next_due_date).toLocaleDateString()
+            : 'N/A',
+          disbursedAt: loan.disbursed_at || null, 
+        }));
+
+        // Client-side filter by disbursed_at month/year
+        const filtered = formattedData.filter((loan) => {
+          if (!loan.disbursedAt) return true;
+          const d = new Date(loan.disbursedAt);
+          if (isNaN(d)) return true;
+          const monthMatch = selectedMonth === null || d.getMonth() === selectedMonth;
+          const yearMatch  = selectedYear  === null || d.getFullYear() === selectedYear;
+          return monthMatch && yearMatch;
+        });
+
+        setData(filtered);
+        setTotalPages(Math.ceil(result.all_items_total / 20));
+        setTotalLoans(filtered.length || result.additional_data?.summary?.total_no_of_loans || 0);
+      } else {
+        Alert.alert('Error', result.error || 'Failed to fetch loans report');
+      }
+    } catch (error) {
+      console.error('Error fetching loans report:', error);
+      Alert.alert('Error', 'Failed to fetch loans report. Please try again.');
+    } finally {
+      setLoading(false);
     }
-    
-    
-    if (filters.due_in_days !== undefined) {
-      requestBody.due_in_days = filters.due_in_days;
-    }
-
-    const url = `${API_BASE_URL}/api/loans/getpaginatedloans/${currentPage}/20`;
-    
-    const response = await fetch(url, {
-      method: 'POST', 
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestBody),
-    });
-
-    const result = await response.json();
-    console.log('API Response Sample:', result.payload[0]);
-
-    if (result.success) {
-      const loans = result.payload || [];
-
-      
-      const formattedData = loans.map((loan) => ({
-        id: loan.id,
-        memberId: loan.client_id,
-        name: loan.name || 'N/A',
-        phone: loan.phone || 'N/A',
-        paid: Number(loan.il_amount_paid || 0),
-        balance: Number(loan.il_balance_due || 0),
-        status: loan.status,
-        statusLabel: getStatusLabel(loan.status),
-        statusStyles: getStatusStyles(loan.status),
-        branch: loan.branch?.name || 'N/A',
-        team: loan.team || 'N/A',
-        bde: loan.bde || 'N/A',
-        dueDate: loan.next_due_date
-          ? new Date(loan.next_due_date).toLocaleDateString()
-          : 'N/A',
-      }));
-
-      
-      setData(formattedData);
-      setTotalPages(Math.ceil(result.all_items_total / 20));
-      setTotalLoans(result.additional_data?.summary?.total_no_of_loans || 0);
-    } else {
-      Alert.alert('Error', result.error || 'Failed to fetch loans report');
-    }
-  } catch (error) {
-    console.error('Error fetching loans report:', error);
-    Alert.alert('Error', 'Failed to fetch loans report. Please try again.');
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   const handleSearch = () => {
     setCurrentPage(1);
@@ -190,9 +208,36 @@ export default function LoansReportScreen() {
     }
   };
 
+  const handleOpenFilterModal = () => {
+    setTempMonth(selectedMonth);
+    setTempYear(selectedYear);
+    setShowFilterModal(true);
+  };
+
+  const handleApplyFilter = () => {
+    setSelectedMonth(tempMonth);
+    setSelectedYear(tempYear);
+    setCurrentPage(1);
+    setShowFilterModal(false);
+  };
+
+  const handleResetDateFilter = () => {
+    setTempMonth(null);
+    setTempYear(null);
+  };
+
+  const hasDateFilter = selectedMonth !== null || selectedYear !== null;
+
+  const getDateFilterLabel = () => {
+    if (selectedMonth !== null && selectedYear !== null) return `${MONTHS[selectedMonth]} ${selectedYear}`;
+    if (selectedMonth !== null) return `${MONTHS[selectedMonth]} (Any Year)`;
+    if (selectedYear !== null) return `All of ${selectedYear}`;
+    return null;
+  };
+
   const renderItem = ({ item }) => (
     <View style={styles.tableRow}>
-      <TouchableOpacity 
+      <TouchableOpacity
         style={[styles.cell, styles.nameCell]}
         onPress={() => handleClientPress(item.memberId)}
         activeOpacity={0.7}
@@ -211,33 +256,33 @@ export default function LoansReportScreen() {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#4285F4" />
-      
+
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => router.push("/actions")} 
+          onPress={() => router.push("/actions")}
         >
           <Ionicons name="arrow-back" size={24} color="white" />
         </TouchableOpacity>
-
         <Text style={styles.headerTitle}>Loans Report</Text>
       </View>
 
+      {/* Active status/due-in-days filter banner */}
       {(activeFilter !== null || dueInDaysFilter !== null) && (
         <View style={styles.filterBanner}>
           <Text style={styles.filterText}>
-            {activeFilter !== null 
+            {activeFilter !== null
               ? (params?.filterLabel || getStatusLabel(activeFilter))
               : `Loans Due in ${dueInDaysFilter} Days`
             }
           </Text>
-          <TouchableOpacity 
+          <TouchableOpacity
             onPress={() => {
               setActiveFilter(null);
               setDueInDaysFilter(null);
               router.replace('/loan_summary');
-            }} 
+            }}
             style={styles.clearFilterButton}
           >
             <Text style={styles.clearFilterText}>Clear Filter ✕</Text>
@@ -274,10 +319,31 @@ export default function LoansReportScreen() {
               <Ionicons name="search" size={20} color="#666" />
             </TouchableOpacity>
           </View>
-          <TouchableOpacity style={styles.filterButton}>
-            <Ionicons name="filter" size={20} color="white" />
+
+          {/* Filter button — shows a dot indicator when not on current month/year */}
+          <TouchableOpacity style={styles.filterButton} onPress={handleOpenFilterModal}>
+            <Ionicons name="calendar-outline" size={20} color="white" />
+            {hasDateFilter && <View style={styles.filterActiveDot} />}
           </TouchableOpacity>
         </View>
+
+        {/* Month/Year label pill */}
+        {hasDateFilter && (
+          <View style={styles.dateFilterPill}>
+            <Ionicons name="calendar" size={13} color="#4285F4" style={{ marginRight: 4 }} />
+            <Text style={styles.dateFilterPillText}>{getDateFilterLabel()}</Text>
+            <TouchableOpacity
+              onPress={() => {
+                setSelectedMonth(null);
+                setSelectedYear(null);
+                setCurrentPage(1);
+              }}
+              style={styles.pillClearBtn}
+            >
+              <Text style={styles.pillClearText}>Clear ✕</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Table Header */}
         <View style={styles.tableHeader}>
@@ -317,11 +383,9 @@ export default function LoansReportScreen() {
           >
             <Ionicons name="arrow-back" size={20} color={currentPage === 1 ? '#ccc' : '#666'} />
           </TouchableOpacity>
-          
           <Text style={styles.pageText}>
             Page {currentPage} of {totalPages || 1}
           </Text>
-          
           <TouchableOpacity
             style={[styles.pageButton, styles.nextButton]}
             onPress={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
@@ -331,6 +395,91 @@ export default function LoansReportScreen() {
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* ── Month/Year Filter Modal ── */}
+      <Modal
+        visible={showFilterModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowFilterModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowFilterModal(false)}
+        >
+          <TouchableOpacity activeOpacity={1} style={styles.modalCard}>
+            {/* Modal Header */}
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Filter by Period</Text>
+              <TouchableOpacity onPress={() => setShowFilterModal(false)}>
+                <Ionicons name="close" size={22} color="#333" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Year selector */}
+            <Text style={styles.sectionLabel}>Year <Text style={styles.sectionHint}>(tap to select/deselect)</Text></Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.yearScroll}
+              contentContainerStyle={styles.yearScrollContent}
+            >
+              {years.map((year) => (
+                <TouchableOpacity
+                  key={year}
+                  style={[styles.yearChip, tempYear === year && styles.yearChipActive]}
+                  onPress={() => setTempYear(tempYear === year ? null : year)}
+                >
+                  <Text style={[styles.yearChipText, tempYear === year && styles.yearChipTextActive]}>
+                    {year}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            {/* Month grid */}
+            <Text style={styles.sectionLabel}>Month <Text style={styles.sectionHint}>(tap to select/deselect)</Text></Text>
+            <View style={styles.monthGrid}>
+              {MONTHS.map((month, index) => (
+                <TouchableOpacity
+                  key={month}
+                  style={[styles.monthChip, tempMonth === index && styles.monthChipActive]}
+                  onPress={() => setTempMonth(tempMonth === index ? null : index)}
+                >
+                  <Text style={[styles.monthChipText, tempMonth === index && styles.monthChipTextActive]}>
+                    {month.slice(0, 3)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Preview label */}
+            <View style={styles.previewRow}>
+              <Ionicons name="calendar-outline" size={14} color="#4285F4" />
+              <Text style={styles.previewText}>
+                {tempMonth !== null && tempYear !== null
+                  ? `${MONTHS[tempMonth]} ${tempYear}`
+                  : tempMonth !== null
+                  ? `${MONTHS[tempMonth]} — Any Year`
+                  : tempYear !== null
+                  ? `All of ${tempYear}`
+                  : 'No filter — showing all loans'}
+              </Text>
+            </View>
+
+            {/* Action buttons */}
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.resetBtn} onPress={handleResetDateFilter}>
+                <Text style={styles.resetBtnText}>Clear All</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.applyBtn} onPress={handleApplyFilter}>
+                <Text style={styles.applyBtnText}>Apply</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
@@ -401,7 +550,7 @@ const styles = StyleSheet.create({
   searchContainer: {
     flexDirection: 'row',
     gap: 12,
-    marginBottom: 16,
+    marginBottom: 8,
   },
   searchBox: {
     flex: 1,
@@ -429,6 +578,47 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  filterActiveDot: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#FF5252',
+    borderWidth: 1,
+    borderColor: 'white',
+  },
+
+  // Date filter pill
+  dateFilterPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: '#E8F0FE',
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    marginBottom: 12,
+  },
+  dateFilterPillText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#4285F4',
+  },
+  pillClearBtn: {
+    marginLeft: 8,
+    backgroundColor: '#4285F4',
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  pillClearText: {
+    fontSize: 11,
+    color: 'white',
+    fontWeight: '600',
+  },
+
   tableHeader: {
     flexDirection: 'row',
     backgroundColor: 'white',
@@ -548,5 +738,149 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#E65100',
+  },
+
+  // ── Modal styles ──
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  modalCard: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 20,
+    width: '100%',
+    maxWidth: 380,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#1A1A1A',
+  },
+  sectionLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#888',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    marginBottom: 10,
+  },
+  sectionHint: {
+    fontSize: 10,
+    fontWeight: '400',
+    color: '#aaa',
+    textTransform: 'none',
+    letterSpacing: 0,
+  },
+  yearScroll: {
+    marginBottom: 20,
+  },
+  yearScrollContent: {
+    gap: 8,
+    paddingRight: 8,
+  },
+  yearChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#F0F0F0',
+    borderWidth: 1.5,
+    borderColor: 'transparent',
+  },
+  yearChipActive: {
+    backgroundColor: '#E8F0FE',
+    borderColor: '#4285F4',
+  },
+  yearChipText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#555',
+  },
+  yearChipTextActive: {
+    color: '#4285F4',
+  },
+  monthGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 20,
+  },
+  monthChip: {
+    width: '22%',
+    paddingVertical: 10,
+    borderRadius: 8,
+    backgroundColor: '#F5F5F5',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: 'transparent',
+  },
+  monthChipActive: {
+    backgroundColor: '#4285F4',
+    borderColor: '#4285F4',
+  },
+  monthChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#555',
+  },
+  monthChipTextActive: {
+    color: 'white',
+  },
+  previewRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginBottom: 20,
+    backgroundColor: '#E8F0FE',
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  previewText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#4285F4',
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  resetBtn: {
+    flex: 1,
+    paddingVertical: 13,
+    borderRadius: 8,
+    backgroundColor: '#F0F0F0',
+    alignItems: 'center',
+  },
+  resetBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#555',
+  },
+  applyBtn: {
+    flex: 1,
+    paddingVertical: 13,
+    borderRadius: 8,
+    backgroundColor: '#4285F4',
+    alignItems: 'center',
+  },
+  applyBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: 'white',
   },
 });
