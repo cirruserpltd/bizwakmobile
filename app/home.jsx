@@ -76,20 +76,26 @@ export default function HomeScreen() {
     setCurrentDate(formattedDate);
   }, []);
 
-  useEffect(() => {
-    fetchIDRData();
-    fetchCashBalance();
-    fetchCustomerSummary();
-    fetchLoansSummary();
-    fetchInstallmentsSummary();
-    fetchPaymentsSummary();
-    fetchKpiTeams();
-  }, []);
+  // 1. Update useEffects
+    useEffect(() => {
+      fetchCashBalance();
+      fetchKpiTeams();
+    }, []);
 
-  useEffect(() => {
-    fetchCollections();          
-    fetchDisbursements();
-  }, [viewType, selectedView, dateFilter]);
+    useEffect(() => {
+      fetchIDRData(viewType, selectedView);
+      fetchCustomerSummary(viewType, selectedView);
+      fetchLoansSummary(viewType, selectedView);
+      fetchInstallmentsSummary(viewType, selectedView);
+      fetchPaymentsSummary(viewType, selectedView);
+      fetchCollections(viewType, selectedView, dateFilter);
+      fetchDisbursements(viewType, selectedView, dateFilter);
+    }, [viewType, selectedView]);
+
+    useEffect(() => {
+      fetchCollections(viewType, selectedView, dateFilter);
+      fetchDisbursements(viewType, selectedView, dateFilter);
+    }, [dateFilter]);
 
   useEffect(() => {
     console.log('Current dateFilter:', dateFilter);
@@ -101,14 +107,14 @@ export default function HomeScreen() {
   const onRefresh = async () => {
     setRefreshing(true);
     await Promise.all([
-      fetchIDRData(), 
+      fetchIDRData(viewType, selectedView),
       fetchCashBalance(),
-      fetchCollections(),          
-      fetchDisbursements(),        
-      fetchCustomerSummary(),
-      fetchLoansSummary(),
-      fetchInstallmentsSummary(),
-      fetchPaymentsSummary(),
+      fetchCollections(viewType, selectedView, dateFilter),
+      fetchDisbursements(viewType, selectedView, dateFilter),
+      fetchCustomerSummary(viewType, selectedView),
+      fetchLoansSummary(viewType, selectedView),
+      fetchInstallmentsSummary(viewType, selectedView),
+      fetchPaymentsSummary(viewType, selectedView),
       fetchKpiTeams()
     ]);
     setRefreshing(false);
@@ -174,39 +180,29 @@ export default function HomeScreen() {
     return 'All Branches';
   };
 
-  const fetchIDRData = async () => {
+  const fetchIDRData = async (vType = viewType, sView = selectedView) => {
     try {
       setLoading(true);
       setError(null);
-
       const token = await AsyncStorage.getItem("token");
-
-      // Build query params
       let queryParams = '';
-      if (viewType === 'branch' && selectedView) {
-        queryParams = `?branch_id=${selectedView.id}`;
-      } else if (viewType === 'cluster' && selectedView) {
-        queryParams = `?cluster_id=${selectedView.id}`;
+      if (vType === 'branch' && sView) {
+        queryParams = `?branch_id=${sView.id}`;
+      } else if (vType === 'cluster' && sView) {
+        queryParams = `?cluster_id=${sView.id}`;
       }
-
       const response = await fetch(`${API_BASE_URL}/api/dashboard/idr${queryParams}`, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         credentials: 'include',
       });
-
       const result = await response.json();
-
       if (result.success && result.payload) {
         setIdrData(result.payload);
       } else {
         setError(result.error || 'Failed to fetch IDR data');
       }
     } catch (err) {
-      console.error('Error fetching IDR data:', err);
       setError('Network error. Please try again.');
     } finally {
       setLoading(false);
@@ -283,148 +279,97 @@ export default function HomeScreen() {
   }
 };
 
-  const fetchCustomerSummary = async () => {
+  const fetchCustomerSummary = async (vType = viewType, sView = selectedView) => {
     try {
       setCustomerLoading(true);
       setCustomerError(null);
-
       const token = await AsyncStorage.getItem("token");
-
       let body = {};
-      
-      // Add filters based on view type
-      if (viewType === 'branch' && selectedView) {
-        body.branch_id = selectedView.id;
-      } else if (viewType === 'cluster' && selectedView) {
-        body.cluster_id = selectedView.id;
+      if (vType === 'branch' && sView) {
+        body.branch_id = sView.id;
+      } else if (vType === 'cluster' && sView) {
+        body.cluster_id = sView.id;
       }
-
       const response = await fetch(`${API_BASE_URL}/api/members/getpaginatedclients/1/1`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         credentials: 'include',
         body: JSON.stringify(body),
       });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Customer summary error response:', errorText);
-        throw new Error(`HTTP ${response.status}: ${errorText}`);
-      }
-
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const result = await response.json();
-
-      if (result.success && result.additional_data && result.additional_data.summary) {
+      if (result.success && result.additional_data?.summary) {
         setCustomerSummary(result.additional_data.summary);
-      } else if (result.success) {
-        setCustomerError('Summary data not found in response');
       } else {
         setCustomerError(result.error || 'Failed to fetch customer summary');
       }
     } catch (err) {
-      console.error('Error fetching customer summary:', err);
-      setCustomerError(err.message || 'Network error. Please try again.');
+      setCustomerError(err.message || 'Network error.');
     } finally {
       setCustomerLoading(false);
     }
   };
 
-  const fetchLoansSummary = async () => {
+  const fetchLoansSummary = async (vType = viewType, sView = selectedView) => {
     try {
       setLoansLoading(true);
       setLoansError(null);
-
       const token = await AsyncStorage.getItem("token");
-
       let body = {};
-      
-      if (viewType === 'branch' && selectedView) {
-        body.branch = selectedView.id;
-      } else if (viewType === 'cluster' && selectedView) {
-        body.cluster = selectedView.id;
+      if (vType === 'branch' && sView) {
+        body.branch = sView.id;
+      } else if (vType === 'cluster' && sView) {
+        body.cluster = sView.id;
       }
-
       const response = await fetch(`${API_BASE_URL}/api/loans/getpaginatedloans/1/1`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         credentials: 'include',
         body: JSON.stringify(body),
       });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Loans summary error response:', errorText);
-        throw new Error(`HTTP ${response.status}: ${errorText}`);
-      }
-
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const result = await response.json();
-
-      if (result.success && result.additional_data && result.additional_data.summary) {
+      if (result.success && result.additional_data?.summary) {
         setLoansSummary(result.additional_data.summary);
-      } else if (result.success) {
-        setLoansError('Summary data not found in response');
       } else {
         setLoansError(result.error || 'Failed to fetch loans summary');
       }
     } catch (err) {
-      console.error('Error fetching loans summary:', err);
-      setLoansError(err.message || 'Network error. Please try again.');
+      setLoansError(err.message || 'Network error.');
     } finally {
       setLoansLoading(false);
     }
   };
 
-  const fetchInstallmentsSummary = async () => {
-  try {
-    setInstallmentsLoading(true);
-    setInstallmentsError(null);
-
-    const token = await AsyncStorage.getItem("token");
-
-    let queryParams = '';
-    if (viewType === 'branch' && selectedView) {
-      queryParams = `?branch=${selectedView.id}`;
-    } else if (viewType === 'cluster' && selectedView) {
-      queryParams = `?cluster=${selectedView.id}`;
+  const fetchInstallmentsSummary = async (vType = viewType, sView = selectedView) => {
+    try {
+      setInstallmentsLoading(true);
+      setInstallmentsError(null);
+      const token = await AsyncStorage.getItem("token");
+      let queryParams = '';
+      if (vType === 'branch' && sView) {
+        queryParams = `?branch=${sView.id}`;
+      } else if (vType === 'cluster' && sView) {
+        queryParams = `?cluster=${sView.id}`;
+      }
+      const response = await fetch(`${API_BASE_URL}/api/loans/getpaginatedinstallments/1/1${queryParams}`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const result = await response.json();
+      if (result.success && result.additional_data?.summary) {
+        setInstallmentsSummary(result.additional_data.summary);
+      } else {
+        setInstallmentsError(result.error || 'Failed to fetch installments summary');
+      }
+    } catch (err) {
+      setInstallmentsError(err.message || 'Network error.');
+    } finally {
+      setInstallmentsLoading(false);
     }
-
-    const response = await fetch(`${API_BASE_URL}/api/loans/getpaginatedinstallments/1/1${queryParams}`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      credentials: 'include',
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Installments summary error response:', errorText);
-      throw new Error(`HTTP ${response.status}: ${errorText}`);
-    }
-
-    const result = await response.json();
-
-    if (result.success && result.additional_data && result.additional_data.summary) {
-      setInstallmentsSummary(result.additional_data.summary);
-    } else if (result.success) {
-      setInstallmentsError('Summary data not found in response');
-    } else {
-      setInstallmentsError(result.error || 'Failed to fetch installments summary');
-    }
-  } catch (err) {
-    console.error('Error fetching installments summary:', err);
-    setInstallmentsError(err.message || 'Network error. Please try again.');
-  } finally {
-    setInstallmentsLoading(false);
-  }
-};
+  };
   const fetchCashBalance = async () => {
   try {
     setCashBalanceLoading(true);
@@ -465,146 +410,91 @@ export default function HomeScreen() {
 
 
 
-const fetchPaymentsSummary = async () => {
-  try {
-    setPaymentsLoading(true);
-    setPaymentsError(null);
-
-    const token = await AsyncStorage.getItem("token");
-
-    
-    let queryParams = '';
-    if (viewType === 'branch' && selectedView) {
-      queryParams = `?branch=${selectedView.id}`;
-    } else if (viewType === 'cluster' && selectedView) {
-      queryParams = `?cluster=${selectedView.id}`;
+  const fetchPaymentsSummary = async (vType = viewType, sView = selectedView) => {
+    try {
+      setPaymentsLoading(true);
+      setPaymentsError(null);
+      const token = await AsyncStorage.getItem("token");
+      let queryParams = '';
+      if (vType === 'branch' && sView) {
+        queryParams = `?branch=${sView.id}`;
+      } else if (vType === 'cluster' && sView) {
+        queryParams = `?cluster=${sView.id}`;
+      }
+      const response = await fetch(`${API_BASE_URL}/api/loans/getpaginatedpayments/1/1${queryParams}`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const result = await response.json();
+      if (result.success && result.additional_data?.summary) {
+        setPaymentsSummary(result.additional_data.summary);
+      } else {
+        setPaymentsError(result.error || 'Failed to fetch payments summary');
+      }
+    } catch (err) {
+      setPaymentsError(err.message || 'Network error.');
+    } finally {
+      setPaymentsLoading(false);
     }
+  };
 
-    const response = await fetch(`${API_BASE_URL}/api/loans/getpaginatedpayments/1/1${queryParams}`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      credentials: 'include',
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Payments summary error response:', errorText);
-      throw new Error(`HTTP ${response.status}: ${errorText}`);
-    }
-
-    const result = await response.json();
-
-    if (result.success && result.additional_data && result.additional_data.summary) {
-      setPaymentsSummary(result.additional_data.summary);
-    } else if (result.success) {
-      setPaymentsError('Summary data not found in response');
-    } else {
-      setPaymentsError(result.error || 'Failed to fetch payments summary');
-    }
-  } catch (err) {
-    console.error('Error fetching payments summary:', err);
-    setPaymentsError(err.message || 'Network error. Please try again.');
-  } finally {
-    setPaymentsLoading(false);
-  }
-};
-
-const fetchCollections = async () => {
+const fetchCollections = async (vType = viewType, sView = selectedView, dFilter = dateFilter) => {
   try {
     setCollectionsLoading(true);
     setCollectionsError(null);
-
     const token = await AsyncStorage.getItem("token");
-
-    const period = dateFilter || 'mtd';
-    let queryParams = `period=${period}`;
-    
-    if (viewType === 'branch' && selectedView) {
-      queryParams += `&branch_id=${selectedView.id}`;
-    } else if (viewType === 'cluster' && selectedView) {
-      queryParams += `&cluster_id=${selectedView.id}`;
+    let queryParams = `period=${dFilter || 'mtd'}`;
+    if (vType === 'branch' && sView) {
+      queryParams += `&branch_id=${sView.id}`;
+    } else if (vType === 'cluster' && sView) {
+      queryParams += `&cluster_id=${sView.id}`;
     }
-
-    //console.log('Fetching collections with params:', queryParams); 
-
     const response = await fetch(`${API_BASE_URL}/api/collections?${queryParams}`, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
       credentials: 'include',
     });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Collections error response:', errorText);
-      throw new Error(`HTTP ${response.status}: ${errorText}`);
-    }
-
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const result = await response.json();
-    //console.log('Collections result:', result); 
-
     if (result.success && result.payload) {
       setCollectionsData(result.payload);
     } else {
       setCollectionsError(result.error || 'Failed to fetch collections');
     }
   } catch (err) {
-    console.error('Error fetching collections:', err);
-    setCollectionsError(err.message || 'Network error. Please try again.');
+    setCollectionsError(err.message || 'Network error.');
   } finally {
     setCollectionsLoading(false);
   }
 };
 
-const fetchDisbursements = async () => {
+const fetchDisbursements = async (vType = viewType, sView = selectedView, dFilter = dateFilter) => {
   try {
     setDisbursementsLoading(true);
     setDisbursementsError(null);
-
     const token = await AsyncStorage.getItem("token");
-
-    const period = dateFilter || 'mtd';
-    let queryParams = `period=${period}`;
-    
-    if (viewType === 'branch' && selectedView) {
-      queryParams += `&branch_id=${selectedView.id}`;
-    } else if (viewType === 'cluster' && selectedView) {
-      queryParams += `&cluster_id=${selectedView.id}`;
+    let queryParams = `period=${dFilter || 'mtd'}`;
+    if (vType === 'branch' && sView) {
+      queryParams += `&branch_id=${sView.id}`;
+    } else if (vType === 'cluster' && sView) {
+      queryParams += `&cluster_id=${sView.id}`;
     }
-
-    //console.log('Fetching disbursements with params:', queryParams); 
-
     const response = await fetch(`${API_BASE_URL}/api/disbursements?${queryParams}`, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
       credentials: 'include',
     });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Disbursements error response:', errorText);
-      throw new Error(`HTTP ${response.status}: ${errorText}`);
-    }
-
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const result = await response.json();
-    //console.log('Disbursements result:', result); 
-
     if (result.success && result.payload) {
       setDisbursementsData(result.payload);
     } else {
       setDisbursementsError(result.error || 'Failed to fetch disbursements');
     }
   } catch (err) {
-    console.error('Error fetching disbursements:', err);
-    setDisbursementsError(err.message || 'Network error. Please try again.');
+    setDisbursementsError(err.message || 'Network error.');
   } finally {
     setDisbursementsLoading(false);
   }

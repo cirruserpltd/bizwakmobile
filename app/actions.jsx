@@ -81,20 +81,16 @@ const actions = () => {
     12: { status: 3, label: 'Pending Disbursement', type: 'loan' },
   };
 
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentDate(new Date());
-    }, 60000);
+useEffect(() => {
+  const timer = setInterval(() => setCurrentDate(new Date()), 60000);
+  getUserId();
+  fetchDashboardData(viewType, selectedView);
+  return () => clearInterval(timer);
+}, []);
 
-    getUserId();
-    fetchDashboardData();
-
-    return () => clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
-    fetchDashboardData();
-  }, [dateFilter, viewType, selectedView]);
+useEffect(() => {
+  fetchDashboardData(viewType, selectedView);
+}, [dateFilter, viewType, selectedView]);
 
   const getUserId = async () => {
     try {
@@ -167,30 +163,23 @@ const actions = () => {
     return 'All Branches';
   };
 
-  const fetchClientSummary = async (token) => {
+  const fetchClientSummary = async (vType = viewType, sView = selectedView, token) => {
   try {
     let body = {};
-    
-    if (viewType === 'branch' && selectedView) {
-      body.branch_id = selectedView.id;
-    } else if (viewType === 'cluster' && selectedView) {
-      body.cluster_id = selectedView.id;
+    if (vType === 'branch' && sView) {
+      body.branch_id = sView.id;
+    } else if (vType === 'cluster' && sView) {
+      body.cluster_id = sView.id;
     }
-
+    console.log('fetchClientSummary called with:', { vType, sViewId: sView?.id, body });
     const response = await fetch(`${API_BASE_URL}/api/members/getpaginatedclients/1/1`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
       credentials: 'include',
       body: JSON.stringify(body),
     });
-
     const result = await response.json();
-    
-    if (result.success && result.additional_data && result.additional_data.summary) {
-      
+    if (result.success && result.additional_data?.summary) {
       setClientSummary(result.additional_data.summary);
       return result.additional_data.summary;
     }
@@ -202,58 +191,38 @@ const actions = () => {
 };
 
 
-  const fetchLoanSummary = async (token) => {
+  const fetchLoanSummary = async (vType = viewType, sView = selectedView, token) => {
   try {
     let body = {};
-    
-    // Add filters based on view type
-    if (viewType === 'branch' && selectedView) {
-      body.branch_id = selectedView.id;
-    } else if (viewType === 'cluster' && selectedView) {
-      body.cluster_id = selectedView.id;
+    if (vType === 'branch' && sView) {
+      body.branch_id = sView.id;
+    } else if (vType === 'cluster' && sView) {
+      body.cluster_id = sView.id;
     }
-
-    // Fetch more records to get actual loan data (increase page size)
     const response = await fetch(`${API_BASE_URL}/api/loans/getpaginatedloans/1/100`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
       credentials: 'include',
       body: JSON.stringify(body),
     });
-
     const result = await response.json();
-    
     if (result.success) {
       let summary = result.additional_data?.summary || {};
-      
       if (result.payload && Array.isArray(result.payload)) {
         const loans = result.payload;
-        
-        const bmApprovalAmount = loans
-          .filter(loan => loan.status === 0) // Pending BM approval
-          .reduce((sum, loan) => sum + (parseFloat(loan.amount) || 0), 0);
-          
-        const hqApprovalAmount = loans
-          .filter(loan => loan.status === 2) // Pending HQ approval
-          .reduce((sum, loan) => sum + (parseFloat(loan.amount) || 0), 0);
-          
-        const disbursementAmount = loans
-          .filter(loan => loan.status === 3) // Pending disbursement
-          .reduce((sum, loan) => sum + (parseFloat(loan.amount) || 0), 0);
-        
-        // Add calculated amounts to summary
         summary = {
           ...summary,
-          total_pending_bm_approval_amount: bmApprovalAmount,
-          total_pending_hq_approval_amount: hqApprovalAmount,
-          total_pending_disbursement_amount: disbursementAmount,
+          total_pending_bm_approval_amount: loans
+            .filter(l => l.status === 0)
+            .reduce((sum, l) => sum + (parseFloat(l.amount) || 0), 0),
+          total_pending_hq_approval_amount: loans
+            .filter(l => l.status === 2)
+            .reduce((sum, l) => sum + (parseFloat(l.amount) || 0), 0),
+          total_pending_disbursement_amount: loans
+            .filter(l => l.status === 3)
+            .reduce((sum, l) => sum + (parseFloat(l.amount) || 0), 0),
         };
-        
       }
-      
       setLoanSummary(summary);
       return summary;
     }
@@ -264,69 +233,54 @@ const actions = () => {
   }
 };
 
-const fetchRequestSummary = async (token) => {
-  try {
-    let body = {};
-    
-    // Add filters based on view type
-    if (viewType === 'branch' && selectedView) {
-      body.branch = selectedView.id;
-    } else if (viewType === 'cluster' && selectedView) {
-      body.cluster = selectedView.id;
-    }
-
-    const response = await fetch(`${API_BASE_URL}/api/loans/requests/list/1/1`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      credentials: 'include',
-      body: JSON.stringify(body),
-    });
-
-    const result = await response.json();
-    
-    if (result.success && result.additional_data && result.additional_data.summary) {
-      setRequestSummary(result.additional_data.summary);
-      return result.additional_data.summary;
-    }
-    return null;
-  } catch (err) {
-    console.error('Error fetching request summary:', err);
-    return null;
-  }
-};
-
-  const fetchDashboardData = async () => {
+  const fetchRequestSummary = async (vType = viewType, sView = selectedView, token) => {
     try {
-      setLoading(true);
-      setError(null);
-
-      const token = await AsyncStorage.getItem("token");
-
-
-      // Fetch all data in parallel
-      const [clientSum, loanSum, requestSum] = await Promise.all([
-        fetchClientSummary(token),
-        fetchLoanSummary(token),
-        fetchRequestSummary(token),
-      ]);
-
-
-      // Update action counts based on client and loan summaries
-      if (clientSum || loanSum || requestSum) {
-        updateActionCounts(clientSum, loanSum, requestSum); 
+      let body = {};
+      if (vType === 'branch' && sView) {
+        body.branch = sView.id;
+      } else if (vType === 'cluster' && sView) {
+        body.cluster = sView.id;
       }
-
+      const response = await fetch(`${API_BASE_URL}/api/loans/requests/list/1/1`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        credentials: 'include',
+        body: JSON.stringify(body),
+      });
+      const result = await response.json();
+      if (result.success && result.additional_data?.summary) {
+        setRequestSummary(result.additional_data.summary);
+        return result.additional_data.summary;
+      }
+      return null;
     } catch (err) {
-      console.error('Error fetching dashboard data:', err);
-      setError('Failed to load dashboard data');
-      Alert.alert('Error', 'Failed to load dashboard data. Please try again.');
-    } finally {
-      setLoading(false);
+      console.error('Error fetching request summary:', err);
+      return null;
     }
   };
+
+  const fetchDashboardData = async (vType = viewType, sView = selectedView) => {
+    console.log('fetchDashboardData called with:', { vType, sViewId: sView?.id });
+  try {
+    setLoading(true);
+    setError(null);
+    const token = await AsyncStorage.getItem("token");
+    const [clientSum, loanSum, requestSum] = await Promise.all([
+      fetchClientSummary(vType, sView, token),
+      fetchLoanSummary(vType, sView, token),
+      fetchRequestSummary(vType, sView, token),
+    ]);
+    if (clientSum || loanSum || requestSum) {
+      updateActionCounts(clientSum, loanSum, requestSum);
+    }
+  } catch (err) {
+    console.error('Error fetching dashboard data:', err);
+    setError('Failed to load dashboard data');
+    Alert.alert('Error', 'Failed to load dashboard data. Please try again.');
+  } finally {
+    setLoading(false);
+  }
+};
 
   const updateActionCounts = (clientSum, loanSum, requestSum) => {
   
@@ -445,11 +399,11 @@ const fetchRequestSummary = async (token) => {
   //   return Math.round(total);
   // };
 
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    await fetchDashboardData();
-    setRefreshing(false);
-  };
+ const handleRefresh = async () => {
+  setRefreshing(true);
+  await fetchDashboardData(viewType, selectedView);
+  setRefreshing(false);
+};
 
   const formatDate = (date) => {
     const options = { weekday: 'short', day: '2-digit', month: 'long', year: 'numeric' };
@@ -775,14 +729,25 @@ const fetchRequestSummary = async (token) => {
               </View>
             </TouchableOpacity>
           </View>
+          <View style={styles.quickButtonsRow}>
             <TouchableOpacity 
-            style={styles.loansDueButton}
-            onPress={handleLoansDuePress}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="time-outline" size={18} color="#E53935" />
-            <Text style={styles.loansDueButtonText}>Loans</Text>
-          </TouchableOpacity>
+              style={styles.loansDueButton}
+              onPress={handleLoansDuePress}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="time-outline" size={18} color="#E53935" />
+              <Text style={styles.loansDueButtonText}>Loans</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.kpiButton}
+              onPress={() => router.push('/kpiTeams')}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="bar-chart-outline" size={18} color="#1565C0" />
+              <Text style={styles.kpiButtonText}>KPI</Text>
+            </TouchableOpacity>
+          </View>
         </View>
         
         <View style={styles.dateRight}>
@@ -801,7 +766,7 @@ const fetchRequestSummary = async (token) => {
           >
             <Ionicons name="warning" size={18} color="#FF6B6B" />
             <Text style={styles.arrearsButtonText}>Arrears</Text>
-          </TouchableOpacity>
+          </TouchableOpacity> 
            {/*Defaulted Loans Button */}
           <TouchableOpacity 
             style={styles.defaultedButton}
@@ -1251,7 +1216,13 @@ const styles = StyleSheet.create({
     color: '#E53935',
     marginLeft: 6,
   },
-  loansDueButton: {
+  quickButtonsRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 8,
+  marginTop: 12,
+},
+loansDueButton: {
   flexDirection: 'row',
   alignItems: 'center',
   backgroundColor: '#FFEBEE',
@@ -1260,13 +1231,27 @@ const styles = StyleSheet.create({
   borderRadius: 12,
   borderWidth: 1,
   borderColor: '#E53935',
-  marginTop: 12,
-  alignSelf: 'flex-start',
 },
 loansDueButtonText: {
   fontSize: 12,
   fontWeight: '600',
   color: '#E53935',
+  marginLeft: 6,
+},
+kpiButton: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  backgroundColor: '#E3F2FD',
+  paddingHorizontal: 12,
+  paddingVertical: 8,
+  borderRadius: 12,
+  borderWidth: 1,
+  borderColor: '#1565C0',
+},
+kpiButtonText: {
+  fontSize: 12,
+  fontWeight: '600',
+  color: '#1565C0',
   marginLeft: 6,
 },
   
