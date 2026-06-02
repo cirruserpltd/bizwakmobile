@@ -15,59 +15,85 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import Constants from 'expo-constants';
+
+import { useViewPermissions, VIEW_LEVEL } from './Useviewpermissions';
+import ViewSwitcherModal from './Viewswitchermodal';
+
 const { API_BASE_URL } = Constants.expoConfig.extra;
 
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December'
+  'July', 'August', 'September', 'October', 'November', 'December',
 ];
 
 export default function KPITeamsScreen() {
-  const router = useRouter();
-  const now = new Date();
+  const router  = useRouter();
+  const now     = new Date();
 
   const [token, setToken] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState([]);
-  const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
-  const [selectedYear, setSelectedYear] = useState(now.getFullYear());
-  const [tempMonth, setTempMonth] = useState(now.getMonth() + 1);
-  const [tempYear, setTempYear] = useState(now.getFullYear());
-  const [showFilterModal, setShowFilterModal] = useState(false);
+
+
+  const {
+    viewType,
+    selectedView,
+    viewLevel,
+    getViewLabel,
+    handleViewSelection,
+    availableBranches,
+    availableTeams,
+    userBranch,
+    userTeam,
+    loadingViews,
+    fetchViewOptions,
+  } = useViewPermissions({ persist: true });
+
+  const [loading,          setLoading]          = useState(false);
+  const [data,             setData]             = useState([]);
+  const [selectedMonth,    setSelectedMonth]    = useState(now.getMonth() + 1);
+  const [selectedYear,     setSelectedYear]     = useState(now.getFullYear());
+  const [tempMonth,        setTempMonth]        = useState(now.getMonth() + 1);
+  const [tempYear,         setTempYear]         = useState(now.getFullYear());
+  const [showFilterModal,  setShowFilterModal]  = useState(false);
+  const [showViewSwitcher, setShowViewSwitcher] = useState(false);
 
   const currentYear = now.getFullYear();
-  const years = Array.from({ length: 8 }, (_, i) => currentYear - 5 + i);
+  const years       = Array.from({ length: 8 }, (_, i) => currentYear - 5 + i);
 
   useEffect(() => {
-    getToken();
+    AsyncStorage.getItem('token')
+      .then((t) => {
+        if (t) setToken(t);
+        else Alert.alert('Error', 'Authentication token not found. Please login again.');
+      })
+      .catch(() => Alert.alert('Error', 'Failed to retrieve authentication token.'));
   }, []);
 
   useEffect(() => {
-    if (!token) return;
+    if (!token || viewLevel === null) return;   
     fetchKPI();
-  }, [token, selectedMonth, selectedYear]);
-
-  const getToken = async () => {
-    try {
-      const t = await AsyncStorage.getItem('token');
-      if (t) setToken(t);
-      else Alert.alert('Error', 'Authentication token not found. Please login again.');
-    } catch (e) {
-      console.error('Error retrieving token:', e);
-    }
-  };
+  }, [token, selectedMonth, selectedYear, viewType, selectedView, viewLevel]);
 
   const fetchKPI = async () => {
     setLoading(true);
     try {
-      const url = `${API_BASE_URL}/api/dashboard/kpi/teams?month=${selectedMonth}&year=${selectedYear}`;
+      let url = `${API_BASE_URL}/api/dashboard/kpi/teams?month=${selectedMonth}&year=${selectedYear}`;
+
+  
+      if (viewType === VIEW_LEVEL.BRANCH && selectedView?.id) {
+        url += `&branch_id=${selectedView.id}`;
+      } else if (viewType === VIEW_LEVEL.TEAM && selectedView?.id) {
+       
+        url += `&cluster_id=${selectedView.id}`;
+      }
+
       const response = await fetch(url, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
       });
+
       const result = await response.json();
       if (result.success && result.payload?.data) {
         setData(parseKPIData(result.payload.data));
@@ -82,47 +108,54 @@ export default function KPITeamsScreen() {
     }
   };
 
-  // API returns:
-  // [ { branch_id, branch_name,
-  //     branch_totals: { disbursement, collection, net_margin, ... },
-  //     teams: [ { team_id, team_name, disbursement, collection, net_margin, ... } ]
-  //   } ]
   const parseKPIData = (raw) => {
     if (!Array.isArray(raw)) return [];
     return raw.map((branchRow) => ({
       branch: branchRow.branch_name || 'Unknown Branch',
       totals: branchRow.branch_totals || {},
       teams: (branchRow.teams || []).map((team) => ({
-        team:         team.team_name || 'Unknown Team',
-        disbursement: Number(team.disbursement || 0),
-        collection:   Number(team.collection   || 0),
-        margin:       Number(team.net_margin   || 0),
+        team:                  team.team_name          || 'Unknown Team',
+        disbursement:          Number(team.disbursement          || 0),
+        expected:              Number(team.expected              || 0),
+        collection:            Number(team.collection            || 0),
+        collection_percentage: Number(team.collection_percentage || 0),
+        gross_margin:          Number(team.gross_margin          || 0),
+        expenses:              Number(team.expenses              || 0),
+        margin:                Number(team.net_margin            || 0),
       })),
     }));
   };
 
-  const fmt = (n) => Number(n).toLocaleString();
-  const getMarginColor = (n) => (n < 0 ? '#D32F2F' : '#388E3C');
-
-  const handleOpenFilter = () => {
-    setTempMonth(selectedMonth);
-    setTempYear(selectedYear);
-    setShowFilterModal(true);
+  const fmt             = (n)   => Number(n).toLocaleString();
+  const getMarginColor  = (n)   => (n < 0 ? '#D32F2F' : '#388E3C');
+  const formatPct       = (v)   => `${Number(v ?? 0).toFixed(2)}%`;
+  const getCollColor    = (pct) => {
+    if (pct >= 98) return '#388E3C';
+    if (pct >= 95) return '#F9A825';
+    return '#D32F2F';
   };
 
-  const handleApplyFilter = () => {
-    setSelectedMonth(tempMonth);
-    setSelectedYear(tempYear);
-    setShowFilterModal(false);
+  const handleOpenFilter  = () => { setTempMonth(selectedMonth); setTempYear(selectedYear); setShowFilterModal(true); };
+  const handleApplyFilter = () => { setSelectedMonth(tempMonth); setSelectedYear(tempYear); setShowFilterModal(false); };
+  const getFilterLabel    = () => `${MONTHS[selectedMonth - 1]} ${selectedYear}`;
+
+  const handleOpenViewSwitcher = () => {
+    fetchViewOptions();          
+    setShowViewSwitcher(true);
   };
 
-  const getFilterLabel = () => `${MONTHS[selectedMonth - 1]} ${selectedYear}`;
+  const handleSelectView = (type, item) => {
+    handleViewSelection(type, item);
+    setShowViewSwitcher(false);
+  };
 
   const renderTeamRow = (item, index) => (
     <View key={index} style={[styles.teamRow, index % 2 === 0 && styles.teamRowAlt]}>
       <Text style={[styles.cell, styles.teamCell]}>{item.team}</Text>
       <Text style={[styles.cell, styles.numCell]}>{fmt(item.disbursement)}</Text>
-      <Text style={[styles.cell, styles.numCell]}>{fmt(item.collection)}</Text>
+      <Text style={[styles.cell, styles.numCell, { color: getCollColor(item.collection_percentage) }]}>
+        {formatPct(item.collection_percentage)}
+      </Text>
       <Text style={[styles.cell, styles.numCell, { color: getMarginColor(item.margin) }]}>
         {fmt(item.margin)}
       </Text>
@@ -131,14 +164,14 @@ export default function KPITeamsScreen() {
 
   const renderBranchSection = ({ item }) => (
     <View style={styles.branchSection}>
-      {/* Branch header */}
       <View style={styles.branchHeader}>
         <Ionicons name="business" size={16} color="#fff" style={{ marginRight: 8 }} />
         <Text style={styles.branchHeaderText}>{item.branch}</Text>
-        <Text style={styles.branchTeamCount}>{item.teams.length} team{item.teams.length !== 1 ? 's' : ''}</Text>
+        <Text style={styles.branchTeamCount}>
+          {item.teams.length} team{item.teams.length !== 1 ? 's' : ''}
+        </Text>
       </View>
 
-      {/* Column headers */}
       <View style={styles.colHeader}>
         <Text style={[styles.colHeaderText, styles.teamCell]}>Team</Text>
         <Text style={[styles.colHeaderText, styles.numCell]}>Disbursement</Text>
@@ -146,7 +179,6 @@ export default function KPITeamsScreen() {
         <Text style={[styles.colHeaderText, styles.numCell]}>Margin</Text>
       </View>
 
-      {/* Team rows */}
       {item.teams.length === 0 ? (
         <View style={styles.emptyBranch}>
           <Text style={styles.emptyBranchText}>No team data</Text>
@@ -155,17 +187,18 @@ export default function KPITeamsScreen() {
         item.teams.map((t, i) => renderTeamRow(t, i))
       )}
 
-      {/* Branch totals row — uses branch_totals from API directly */}
       {item.teams.length > 0 && (
         <View style={styles.totalRow}>
           <Text style={[styles.cell, styles.teamCell, styles.totalLabel]}>Total</Text>
           <Text style={[styles.cell, styles.numCell, styles.totalValue]}>
             {fmt(item.totals.disbursement || 0)}
           </Text>
-          <Text style={[styles.cell, styles.numCell, styles.totalValue]}>
-            {fmt(item.totals.collection || 0)}
+          <Text style={[styles.cell, styles.numCell, styles.totalValue,
+            { color: getCollColor(item.totals.collection_percentage || 0) }]}>
+            {formatPct(item.totals.collection_percentage || 0)}
           </Text>
-          <Text style={[styles.cell, styles.numCell, styles.totalValue, { color: getMarginColor(item.totals.net_margin || 0) }]}>
+          <Text style={[styles.cell, styles.numCell, styles.totalValue,
+            { color: getMarginColor(item.totals.net_margin || 0) }]}>
             {fmt(item.totals.net_margin || 0)}
           </Text>
         </View>
@@ -173,11 +206,18 @@ export default function KPITeamsScreen() {
     </View>
   );
 
+
+  const scopeIcon = viewType === VIEW_LEVEL.TEAM
+    ? 'people'
+    : viewType === VIEW_LEVEL.BRANCH
+    ? 'location'
+    : 'business';
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#4285F4" />
 
-      {/* Header */}
+      {/* ── Header ── */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => router.push('/actions')}>
           <Ionicons name="arrow-back" size={24} color="white" />
@@ -188,22 +228,38 @@ export default function KPITeamsScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Period pill */}
+      {/* ── Period + View row ── */}
       <View style={styles.periodRow}>
+        {/* Period pill */}
         <View style={styles.periodPill}>
           <Ionicons name="calendar" size={13} color="#4285F4" style={{ marginRight: 5 }} />
           <Text style={styles.periodPillText}>{getFilterLabel()}</Text>
         </View>
+
+        {/* View pill — tappable to open switcher */}
+        <TouchableOpacity
+          style={styles.viewPill}
+          onPress={handleOpenViewSwitcher}
+          activeOpacity={0.75}
+        >
+          <Ionicons name={scopeIcon} size={13} color="#388E3C" style={{ marginRight: 5 }} />
+          <Text style={styles.viewPillText} numberOfLines={1}>{getViewLabel()}</Text>
+          {/* Only show chevron when user can switch */}
+          {viewLevel === VIEW_LEVEL.ALL && (
+            <Ionicons name="chevron-down" size={12} color="#388E3C" style={{ marginLeft: 3 }} />
+          )}
+        </TouchableOpacity>
+
         <TouchableOpacity style={styles.refreshBtn} onPress={fetchKPI}>
           <Ionicons name="refresh" size={16} color="#4285F4" />
         </TouchableOpacity>
       </View>
 
-      {/* Content */}
+      {/* ── Content ── */}
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#4285F4" />
-          <Text style={styles.loadingText}>Loading KPI data...</Text>
+          <Text style={styles.loadingText}>Loading KPI data…</Text>
         </View>
       ) : (
         <FlatList
@@ -221,7 +277,7 @@ export default function KPITeamsScreen() {
         />
       )}
 
-      {/* Month/Year Filter Modal */}
+      {/* ── Month/Year Filter Modal ── */}
       <Modal
         visible={showFilterModal}
         transparent
@@ -241,7 +297,6 @@ export default function KPITeamsScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* Year */}
             <Text style={styles.sectionLabel}>Year</Text>
             <ScrollView
               horizontal
@@ -262,7 +317,6 @@ export default function KPITeamsScreen() {
               ))}
             </ScrollView>
 
-            {/* Month */}
             <Text style={styles.sectionLabel}>Month</Text>
             <View style={styles.monthGrid}>
               {MONTHS.map((month, index) => (
@@ -294,9 +348,26 @@ export default function KPITeamsScreen() {
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
+
+      {/* ── View Switcher Modal ── */}
+      <ViewSwitcherModal
+        visible={showViewSwitcher}
+        onClose={() => setShowViewSwitcher(false)}
+        onSelect={handleSelectView}
+        viewType={viewType}
+        selectedView={selectedView}
+        viewLevel={viewLevel}
+        availableBranches={availableBranches}
+        availableTeams={availableTeams}
+        userBranch={userBranch}
+        userTeam={userTeam}
+        loading={loadingViews}
+        accentColor="#4285F4"
+      />
     </View>
   );
 }
+
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F5F5F5' },
@@ -309,8 +380,8 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingTop: StatusBar.currentHeight ? StatusBar.currentHeight + 16 : 50,
   },
-  backButton: { marginRight: 12 },
-  headerTitle: { flex: 1, fontSize: 20, fontWeight: '600', color: 'white' },
+  backButton:    { marginRight: 12 },
+  headerTitle:   { flex: 1, fontSize: 20, fontWeight: '600', color: 'white' },
   filterIconBtn: { padding: 4 },
 
   periodRow: {
@@ -322,6 +393,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderBottomWidth: 1,
     borderBottomColor: '#E0E0E0',
+    gap: 8,
   },
   periodPill: {
     flexDirection: 'row',
@@ -332,6 +404,24 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
   },
   periodPillText: { fontSize: 13, fontWeight: '600', color: '#4285F4' },
+
+  // ── view pill is now a TouchableOpacity ──
+  viewPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E8F5E9',
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    flexShrink: 1,
+    maxWidth: '55%',
+  },
+  viewPillText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#388E3C',
+    flexShrink: 1,
+  },
   refreshBtn: {
     padding: 8,
     backgroundColor: '#E8F0FE',
@@ -409,21 +499,21 @@ const styles = StyleSheet.create({
   totalLabel: { fontWeight: '700', color: '#333' },
   totalValue: { fontWeight: '700', color: '#222' },
 
-  cell: { fontSize: 13, color: '#333' },
+  cell:     { fontSize: 13, color: '#333' },
   teamCell: { flex: 1.2, paddingRight: 4 },
-  numCell: { flex: 1, textAlign: 'right' },
+  numCell:  { flex: 1, textAlign: 'right' },
 
-  emptyBranch: { padding: 20, alignItems: 'center' },
+  emptyBranch:     { padding: 20, alignItems: 'center' },
   emptyBranchText: { fontSize: 13, color: '#999' },
 
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  loadingText: { marginTop: 12, fontSize: 14, color: '#666' },
+  loadingText:      { marginTop: 12, fontSize: 14, color: '#666' },
 
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 80 },
-  emptyText: { fontSize: 16, fontWeight: '600', color: '#999', marginTop: 16 },
-  emptySubText: { fontSize: 13, color: '#bbb', marginTop: 4 },
+  emptyText:      { fontSize: 16, fontWeight: '600', color: '#999', marginTop: 16 },
+  emptySubText:   { fontSize: 13, color: '#bbb', marginTop: 4 },
 
-  // Modal
+  // ── Filter modal ──
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.45)',
@@ -449,7 +539,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 20,
   },
-  modalTitle: { fontSize: 17, fontWeight: '700', color: '#1A1A1A' },
+  modalTitle:   { fontSize: 17, fontWeight: '700', color: '#1A1A1A' },
   sectionLabel: {
     fontSize: 11,
     fontWeight: '700',
@@ -458,7 +548,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.6,
     marginBottom: 10,
   },
-  yearScroll: { marginBottom: 20 },
+  yearScroll:        { marginBottom: 20 },
   yearScrollContent: { gap: 8, paddingRight: 8 },
   yearChip: {
     paddingHorizontal: 16,
@@ -468,8 +558,8 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: 'transparent',
   },
-  yearChipActive: { backgroundColor: '#E8F0FE', borderColor: '#4285F4' },
-  yearChipText: { fontSize: 14, fontWeight: '600', color: '#555' },
+  yearChipActive:     { backgroundColor: '#E8F0FE', borderColor: '#4285F4' },
+  yearChipText:       { fontSize: 14, fontWeight: '600', color: '#555' },
   yearChipTextActive: { color: '#4285F4' },
   monthGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 },
   monthChip: {
@@ -481,8 +571,8 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: 'transparent',
   },
-  monthChipActive: { backgroundColor: '#4285F4', borderColor: '#4285F4' },
-  monthChipText: { fontSize: 13, fontWeight: '600', color: '#555' },
+  monthChipActive:     { backgroundColor: '#4285F4', borderColor: '#4285F4' },
+  monthChipText:       { fontSize: 13, fontWeight: '600', color: '#555' },
   monthChipTextActive: { color: 'white' },
   previewRow: {
     flexDirection: 'row',
@@ -494,8 +584,8 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 8,
   },
-  previewText: { fontSize: 14, fontWeight: '700', color: '#4285F4' },
-  modalActions: { flexDirection: 'row', gap: 10 },
+  previewText:   { fontSize: 14, fontWeight: '700', color: '#4285F4' },
+  modalActions:  { flexDirection: 'row', gap: 10 },
   cancelBtn: {
     flex: 1,
     paddingVertical: 13,

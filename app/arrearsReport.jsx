@@ -11,7 +11,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
@@ -39,8 +39,10 @@ const ArrearsReport = () => {
   
   const router = useRouter();
   const navigation = useNavigation();
+  const params = useLocalSearchParams(); 
+  const { viewBranchId, viewClusterId } = params;
 
-  const fetchArrearsReport = async (page = 1, filters = {}) => {
+  const fetchArrearsReport = async (page = 1, filters = {}, branchId = null, clusterId = null) => {
     try {
       setLoading(true);
       
@@ -50,6 +52,12 @@ const ArrearsReport = () => {
         Alert.alert('Error', 'Authentication token not found. Please login again.');
         return;
       }
+
+      const effectiveBranchId = branchId ?? viewBranchId;
+      const effectiveClusterId = clusterId ?? viewClusterId;
+
+      if (effectiveBranchId) filters.branch = parseInt(effectiveBranchId);
+      else if (effectiveClusterId) filters.cluster = parseInt(effectiveClusterId);
 
       const apiUrl = `${API_BASE_URL}/api/loans/arrears/${page}/${itemsPerPage}`;
       
@@ -88,12 +96,10 @@ const ArrearsReport = () => {
         setFilteredData(transformedData);
         setTotalClients(data.all_items_total || 0);
         
-        // Calculate total pages
         const pages = Math.ceil((data.all_items_total || 0) / itemsPerPage);
         setTotalPages(pages);
         setCurrentPage(data.current_page || 1);
 
-        // Set summary data
         if (data.additional_data && data.additional_data.summary) {
           setSummary(data.additional_data.summary);
         }
@@ -110,7 +116,30 @@ const ArrearsReport = () => {
   };
 
   useEffect(() => {
-    fetchArrearsReport(1);
+    const loadAndFetch = async () => {
+      let branchId = viewBranchId;
+      let clusterId = viewClusterId;
+
+      if (!branchId && !clusterId) {
+        try {
+          const savedType = await AsyncStorage.getItem('savedViewType');
+          const savedItemStr = await AsyncStorage.getItem('savedViewItem');
+          const savedItem = savedItemStr ? JSON.parse(savedItemStr) : null;
+
+          if (savedType === 'branch' && savedItem?.id) {
+            branchId = savedItem.id;
+          } else if (savedType === 'cluster' && savedItem?.id) {
+            clusterId = savedItem.id;
+          }
+        } catch (e) {
+          // ignore, fetch all
+        }
+      }
+
+      fetchArrearsReport(1, {}, branchId, clusterId);  // <-- pass them here
+    };
+
+    loadAndFetch();
   }, []);
 
   const handleSearch = (text) => {
@@ -128,39 +157,38 @@ const ArrearsReport = () => {
   };
 
   const handleServerSearch = async () => {
-    if (searchQuery.trim() === '') {
-      fetchArrearsReport(1);
-      return;
-    }
+  if (searchQuery.trim() === '') {
+    fetchArrearsReport(1, {}, viewBranchId, viewClusterId);
+    return;
+  }
 
-    const filters = {};
-    
-    if (/^\d+$/.test(searchQuery)) {
-      filters.phone = searchQuery;
-    } else {
-      filters.client_name = searchQuery;
-    }
+  const filters = {};
+  if (/^\d+$/.test(searchQuery)) {
+    filters.phone = searchQuery;
+  } else {
+    filters.client_name = searchQuery;
+  }
 
-    await fetchArrearsReport(1, filters);
-  };
+  await fetchArrearsReport(1, filters, viewBranchId, viewClusterId);
+};
 
   const handleRefresh = () => {
-    setRefreshing(true);
-    setSearchQuery('');
-    fetchArrearsReport(1);
-  };
+  setRefreshing(true);
+  setSearchQuery('');
+  fetchArrearsReport(1, {}, viewBranchId, viewClusterId);
+};
 
-  const handleNextPage = () => {
-    if (currentPage < totalPages) {
-      fetchArrearsReport(currentPage + 1);
-    }
-  };
+const handleNextPage = () => {
+  if (currentPage < totalPages) {
+    fetchArrearsReport(currentPage + 1, {}, viewBranchId, viewClusterId);
+  }
+};
 
-  const handlePreviousPage = () => {
-    if (currentPage > 1) {
-      fetchArrearsReport(currentPage - 1);
-    }
-  };
+const handlePreviousPage = () => {
+  if (currentPage > 1) {
+    fetchArrearsReport(currentPage - 1, {}, viewBranchId, viewClusterId);
+  }
+};
 
   const handleClientPress = (client) => {
     router.push({

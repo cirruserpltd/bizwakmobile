@@ -33,6 +33,9 @@ const ClientSummary = () => {
   const navigation = useNavigation();
   const params = useLocalSearchParams();
 
+  const { statusFilter, filterLabel, viewBranchId, viewClusterId } = useLocalSearchParams();
+
+
  
   const getStatusFromRoute = (route) => {
   const statusMap = {
@@ -84,6 +87,9 @@ const ClientSummary = () => {
       }
 
       const apiUrl = `${API_BASE_URL}/api/members/getpaginatedclients/${page}/${itemsPerPage}`;
+
+      if (viewBranchId) filters.branch_id = parseInt(viewBranchId);
+      else if (viewClusterId) filters.cluster_id = parseInt(viewClusterId);
       
       const requestOptions = {
         method: 'POST',

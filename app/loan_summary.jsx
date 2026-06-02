@@ -23,6 +23,8 @@ const MONTHS = [
   'July', 'August', 'September', 'October', 'November', 'December'
 ];
 
+
+
 export default function LoansReportScreen() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
@@ -45,6 +47,7 @@ export default function LoansReportScreen() {
 
   const currentYear = now.getFullYear();
   const years = Array.from({ length: 8 }, (_, i) => currentYear - 5 + i);
+  const { statusFilter, dueInDays, filterLabel, viewBranchId, viewClusterId } = useLocalSearchParams();
 
   useEffect(() => {
     getToken();
@@ -53,19 +56,25 @@ export default function LoansReportScreen() {
   useEffect(() => {
     if (!token) return;
 
-    if (params?.statusFilter !== undefined && params.statusFilter !== null) {
-      setActiveFilter(params.statusFilter);
+    const statusParam = params?.statusFilter;
+    const dueParam = params?.dueInDays;
+
+    const filters = {};
+
+    if (statusParam !== undefined && statusParam !== null) {
+      setActiveFilter(statusParam);
       setDueInDaysFilter(null);
-      fetchLoansReport({ status: params.statusFilter });
-    } else if (params?.dueInDays !== undefined && params.dueInDays !== null) {
-      setDueInDaysFilter(params.dueInDays);
+      filters.status = statusParam;
+    } else if (dueParam !== undefined && dueParam !== null) {
+      setDueInDaysFilter(dueParam);
       setActiveFilter(null);
-      fetchLoansReport({ due_in_days: params.dueInDays });
+      filters.due_in_days = dueParam;
     } else {
       setActiveFilter(null);
       setDueInDaysFilter(null);
-      fetchLoansReport();
     }
+
+    fetchLoansReport(filters);
   }, [token, currentPage, searchQuery, params?.statusFilter, params?.dueInDays, selectedMonth, selectedYear]);
 
   const getToken = async () => {
@@ -123,81 +132,83 @@ export default function LoansReportScreen() {
     }
   };
 
-  const fetchLoansReport = async (filters = {}, dateOverride = {}) => {
-  setLoading(true);
-  try {
-    const requestBody = {};
+  const fetchLoansReport = async (filters = {}) => {
+    setLoading(true);
+    try {
+      const requestBody = {};
 
-    if (filters.status !== undefined) {
-      requestBody.status = filters.status;
+      if (filters.status !== undefined && filters.status !== null) {
+        requestBody.status = filters.status;
+      }
+      if (filters.due_in_days !== undefined && filters.due_in_days !== null) {
+        requestBody.due_in_days = filters.due_in_days;
+      }
+
+      if (viewBranchId) requestBody.branch_id = parseInt(viewBranchId);
+      else if (viewClusterId) requestBody.cluster_id = parseInt(viewClusterId);
+
+      const month = selectedMonth;
+      const year = selectedYear;
+      const hasDateFilter = month !== null || year !== null;
+
+      const url = `${API_BASE_URL}/api/loans/getpaginatedloans/${hasDateFilter ? 1 : currentPage}/500`;
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        const loans = result.payload || [];
+        const formattedData = loans.map((loan) => ({
+          id: loan.id,
+          memberId: loan.client_id,
+          name: loan.name || 'N/A',
+          phone: loan.phone || 'N/A',
+          paid: Number(loan.il_amount_paid || 0),
+          balance: Number(loan.il_balance_due || 0),
+          status: loan.status,
+          statusLabel: getStatusLabel(loan.status),
+          statusStyles: getStatusStyles(loan.status),
+          branch: loan.branch?.name || 'N/A',
+          team: loan.team || 'N/A',
+          bde: loan.bde || 'N/A',
+          dueDate: loan.next_due_date
+            ? new Date(loan.next_due_date).toLocaleDateString()
+            : 'N/A',
+          disbursedAt: loan.disbursed_at || null,
+        }));
+
+        const filtered = hasDateFilter
+          ? formattedData.filter((loan) => {
+              if (!loan.disbursedAt) return false;
+              const d = new Date(loan.disbursedAt);
+              if (isNaN(d)) return false;
+              const monthMatch = month === null || d.getMonth() === month;
+              const yearMatch = year === null || d.getFullYear() === year;
+              return monthMatch && yearMatch;
+            })
+          : formattedData;
+
+        setData(filtered);
+        setTotalPages(hasDateFilter ? 1 : Math.ceil(result.all_items_total / 20));
+        setTotalLoans(hasDateFilter ? filtered.length : (result.all_items_total || 0));
+      } else {
+        Alert.alert('Error', result.error || 'Failed to fetch loans report');
+      }
+    } catch (error) {
+      console.error('Error fetching loans report:', error);
+      Alert.alert('Error', 'Failed to fetch loans report. Please try again.');
+    } finally {
+      setLoading(false);
     }
-    if (filters.due_in_days !== undefined) {
-      requestBody.due_in_days = filters.due_in_days;
-    }
-
-    const month = 'month' in dateOverride ? dateOverride.month : selectedMonth;
-    const year  = 'year'  in dateOverride ? dateOverride.year  : selectedYear;
-
-    const hasDateFilter = month !== null || year !== null;
-
-    const url = `${API_BASE_URL}/api/loans/getpaginatedloans/${hasDateFilter ? 1 : currentPage}/500`;
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestBody),
-    });
-
-    const result = await response.json();
-
-    if (result.success) {
-      const loans = result.payload || [];
-      const formattedData = loans.map((loan) => ({
-        id: loan.id,
-        memberId: loan.client_id,
-        name: loan.name || 'N/A',
-        phone: loan.phone || 'N/A',
-        paid: Number(loan.il_amount_paid || 0),
-        balance: Number(loan.il_balance_due || 0),
-        status: loan.status,
-        statusLabel: getStatusLabel(loan.status),
-        statusStyles: getStatusStyles(loan.status),
-        branch: loan.branch?.name || 'N/A',
-        team: loan.team || 'N/A',
-        bde: loan.bde || 'N/A',
-        dueDate: loan.next_due_date
-          ? new Date(loan.next_due_date).toLocaleDateString()
-          : 'N/A',
-        disbursedAt: loan.disbursed_at || null,
-      }));
-
-      // Client-side filter by disbursed_at month/year when date filter is active
-      const filtered = hasDateFilter
-        ? formattedData.filter((loan) => {
-            if (!loan.disbursedAt) return false; // exclude undisbursed when filtering by date
-            const d = new Date(loan.disbursedAt);
-            if (isNaN(d)) return false;
-            const monthMatch = month === null || d.getMonth() === month;
-            const yearMatch  = year  === null || d.getFullYear() === year;
-            return monthMatch && yearMatch;
-          })
-        : formattedData;
-
-      setData(filtered);
-      setTotalPages(hasDateFilter ? 1 : Math.ceil(result.all_items_total / 20));
-      setTotalLoans(hasDateFilter ? filtered.length : (result.all_items_total || 0));
-    } else {
-      Alert.alert('Error', result.error || 'Failed to fetch loans report');
-    }
-  } catch (error) {
-    console.error('Error fetching loans report:', error);
-    Alert.alert('Error', 'Failed to fetch loans report. Please try again.');
-  } finally {
-    setLoading(false);
-  }
-};
+  };
   const handleSearch = () => {
     setCurrentPage(1);
     fetchLoansReport();
@@ -282,10 +293,10 @@ export default function LoansReportScreen() {
             }
           </Text>
           <TouchableOpacity
-            onPress={() => {
+           onPress={() => {
               setActiveFilter(null);
               setDueInDaysFilter(null);
-              router.replace('/loan_summary');
+              fetchLoansReport({}); 
             }}
             style={styles.clearFilterButton}
           >

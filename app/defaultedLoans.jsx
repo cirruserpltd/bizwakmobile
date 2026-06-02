@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import Constants from 'expo-constants';
 
 const { API_BASE_URL } = Constants.expoConfig.extra;
@@ -29,12 +29,14 @@ export default function DefaultedLoans() {
   const [token, setToken] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Fetch token on mount
+  const params = useLocalSearchParams();
+  const { viewBranchId, viewClusterId } = params;
+
+
   useEffect(() => {
     getToken();
   }, []);
 
-  // Fetch data when token or page changes
   useEffect(() => {
     if (token) {
       fetchDefaultedLoans();
@@ -62,9 +64,12 @@ export default function DefaultedLoans() {
       
       // Build request body with status filter for defaulted loans (status = 6)
       const requestBody = {
-        status: 6, // Defaulted status
+        status: 6, 
         ...searchFilters
       };
+
+       if (viewBranchId) requestBody.branch_id = parseInt(viewBranchId);
+       else if (viewClusterId) requestBody.cluster_id = parseInt(viewClusterId);
 
       const response = await fetch(url, {
         method: 'POST',

@@ -41,16 +41,34 @@ const UserProfile = () => {
   const getTokenAndFetchData = async () => {
     try {
       const storedToken = await AsyncStorage.getItem('token');
-      if (storedToken) {
-        setToken(storedToken);
-        fetchUserData(storedToken);
-      } else {
+      if (!storedToken) {
         Alert.alert('Error', 'No authentication token found. Please login again.');
         router.push('/login');
+        return;
       }
+      setToken(storedToken);
+
+      if (!userId) {
+        const res = await fetch(`${API_BASE_URL}/api/users/currentUser`, {
+          headers: { Authorization: `Bearer ${storedToken}` },
+        });
+        const data = await res.json();
+        const u = Array.isArray(data?.payload) ? data.payload[0] : data?.payload;
+        if (u) {
+          setUser(u);
+          setFullName(u.name || u.full_name || '');
+          setEmail(u.email || '');
+          setPhone(u.phone || '');
+          setIdNumber(u.id_number || '');
+          setNssfNumber(u.nssf_number || '');
+          setNhifNumber(u.nhif_number || '');
+        }
+        return;
+      }
+
+      fetchUserData(storedToken);
     } catch (error) {
       console.error('Error getting token:', error);
-      Alert.alert('Error', 'Failed to retrieve authentication token');
     }
   };
 
