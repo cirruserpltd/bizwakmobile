@@ -180,7 +180,7 @@ const actions = () => {
     try {
       const body = {};
       if (vType === VIEW_LEVEL.BRANCH && sView) body.branch  = sView.id;
-      if (vType === VIEW_LEVEL.TEAM   && sView) body.cluster = sView.id; // backend param unchanged
+      if (vType === VIEW_LEVEL.TEAM   && sView) body.cluster = sView.id; 
       const response = await fetch(`${API_BASE_URL}/api/loans/requests/list/1/1`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -362,15 +362,20 @@ const actions = () => {
                 onPress={handleViewButtonPress}
                 activeOpacity={0.7}
               >
-                <View style={styles.currentViewContent}>
-                  <Ionicons name={viewIcon} size={14} color={ACCENT} />
-                  <Text style={styles.currentViewValue} numberOfLines={1}>
-                    {viewLevel === null ? 'Loading…' : getViewLabel()}
+              <View style={styles.currentViewContent}>
+                <Ionicons name={viewIcon} size={14} color={ACCENT} />
+                <View style={styles.currentViewTextWrapper}>
+                  <Text style={styles.currentViewMiniLabel}>
+                    {viewLevel === null ? 'Loading…' : canSwitchView ? 'Current View:' : 'Your View:'}
                   </Text>
-                  {canSwitchView
-                    ? <Ionicons name="chevron-down" size={14} color={ACCENT} />
-                    : <Ionicons name="lock-closed-outline" size={13} color={ACCENT} style={{ opacity: 0.45 }} />}
+                  <Text style={styles.currentViewValue} numberOfLines={1}>
+                    {viewLevel === null ? '—' : getViewLabel()}
+                  </Text>
                 </View>
+                {canSwitchView
+                  ? <Ionicons name="chevron-down" size={14} color={ACCENT} />
+                  : <Ionicons name="lock-closed-outline" size={13} color={ACCENT} style={{ opacity: 0.45 }} />}
+              </View>
               </TouchableOpacity>
             </View>
 
@@ -460,7 +465,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
@@ -468,7 +473,7 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   dateLeft:  { flex: 1 },
-  dateRight: { alignItems: 'flex-end', gap: 10 },
+  dateRight: { alignItems: 'flex-end', gap: 10, justifyContent: 'center', alignSelf: 'stretch' },
   dateLabel: { fontSize: 18, fontWeight: 'bold', color: '#000000', marginBottom: 4 },
   dateValue: { fontSize: 14, color: '#666666' },
 
@@ -478,14 +483,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 12,
-    alignSelf: 'flex-start',
     borderWidth: 1,
     borderColor: ACCENT,
-    maxWidth: 180,
+    maxWidth: 160,
   },
   currentViewContent: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  currentViewValue: { fontSize: 13, fontWeight: '600', color: ACCENT, flexShrink: 1 },
-
+  currentViewValue: { fontSize: 13, fontWeight: '600', color: ACCENT, },
+  currentViewTextWrapper: {
+    flex: 1,          
+    minWidth: 0,      
+  },
+  currentViewMiniLabel: { 
+    fontSize: 9, 
+    color: '#757575', 
+    marginBottom: 1,
+  },
   profileButton: {
     width: 44, height: 44,
     backgroundColor: ACCENT,
@@ -530,6 +542,7 @@ const styles = StyleSheet.create({
   actionSubtitle:      { fontSize: 11, color: '#666666', marginTop: 2 },
   actionBadge:         { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 14, minWidth: 32, alignItems: 'center', justifyContent: 'center' },
   actionBadgeText:     { fontSize: 13, fontWeight: 'bold' },
+
 });
 
 export default actions;
